@@ -2,10 +2,40 @@ import { HapticTab } from '@/components/haptic-tab';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Image, StyleSheet } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
+import { getChats } from '@/services/api';
+import { useFocusEffect } from '@react-navigation/native';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const [totalUnreadCount, setTotalUnreadCount] = React.useState(0);
+
+  // Fetch total unread count
+  const fetchUnreadCount = React.useCallback(async () => {
+    try {
+      const response = await getChats();
+      if (response && response.data && response.data.chats) {
+        // Count how many chats have unread messages (not total unread messages)
+        const unreadChatsCount = response.data.chats.filter((chat: any) => {
+          return (chat.unreadCount || 0) > 0;
+        }).length;
+        setTotalUnreadCount(unreadChatsCount);
+      }
+    } catch (error) {
+      console.error('Failed to fetch unread count:', error);
+    }
+  }, []);
+
+  // Fetch on mount and when tab comes into focus
+  React.useEffect(() => {
+    fetchUnreadCount();
+  }, [fetchUnreadCount]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchUnreadCount();
+    }, [fetchUnreadCount])
+  );
 
   return (
     <Tabs
@@ -57,7 +87,7 @@ export default function TabLayout() {
           title: 'Contacts',
           tabBarIcon: ({ focused }) => (
             <Image 
-              source={require('../../assets/images/contacts.png')}
+              source={focused ? require('../../assets/images/contacts_filled.png') : require('../../assets/images/contacts.png')}
               style={[styles.tabIcon, focused && styles.activeIcon]} 
               resizeMode="contain"
             />
@@ -69,11 +99,20 @@ export default function TabLayout() {
         options={{
           title: 'Chats',
           tabBarIcon: ({ focused }) => (
-            <Image 
-              source={focused ? require('../../assets/images/chat_filled.png') : require('../../assets/images/chat_filled.png')}
-              style={[styles.tabIcon, focused && styles.activeIcon]} 
-              resizeMode="contain"
-            />
+            <View style={styles.iconContainer}>
+              <Image 
+                source={focused ? require('../../assets/images/chat_filled.png') : require('../../assets/images/chat.png')}
+                style={[styles.tabIcon, focused && styles.activeIcon]} 
+                resizeMode="contain"
+              />
+              {totalUnreadCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
+                  </Text>
+                </View>
+              )}
+            </View>
           ),
         }}
       />
@@ -95,6 +134,11 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
+  iconContainer: {
+    width: 32,
+    height: 32,
+    position: 'relative',
+  },
   tabIcon: {
     width: 32,
     height: 32,
@@ -102,5 +146,25 @@ const styles = StyleSheet.create({
   activeIcon: {
     opacity: 1,
     tintColor: '#1A1A1A',
+  },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -8,
+    backgroundColor: '#000',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#F3F3F3',
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 14,
   },
 });

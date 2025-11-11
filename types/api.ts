@@ -65,7 +65,6 @@ export interface UpdateUserResponse {
 
 // Create Chat
 export interface CreateChatRequest {
-  user_id: number;
   other_user_id: number;
   is_group: boolean;
 }
@@ -95,7 +94,8 @@ export interface Message {
   sender_id: number;
   content: string;
   message_type: MessageType;
-  created_at: string;
+  sent_at: string; // Backend uses sent_at, not created_at
+  created_at?: string; // Keep for backwards compatibility
   status?: MessageStatus;
   is_deleted?: boolean;
   tempId?: string; // For optimistic UI updates

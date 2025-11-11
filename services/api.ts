@@ -229,7 +229,6 @@ export async function isAuthenticated(): Promise<boolean> {
  * Create a new chat between two users
  */
 export async function createChat(
-  userId: number,
   otherUserId: number,
   isGroup: boolean = false
 ): Promise<CreateChatResponse> {
@@ -244,7 +243,6 @@ export async function createChat(
   }
 
   const body: CreateChatRequest = {
-    user_id: userId,
     other_user_id: otherUserId,
     is_group: isGroup,
   };
@@ -262,7 +260,7 @@ export async function createChat(
 /**
  * Get all chats for a user
  */
-export async function getChats(userId: number): Promise<any> {
+export async function getChats(): Promise<any> {
   const token = await getAuthToken();
   
   if (!token) {
@@ -273,7 +271,7 @@ export async function getChats(userId: number): Promise<any> {
     } as ApiError;
   }
 
-  return fetchApi<any>(`${API_ENDPOINTS.chats.list}?user_id=${userId}`, {
+  return fetchApi<any>(API_ENDPOINTS.chats.list, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`,

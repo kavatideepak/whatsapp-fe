@@ -2,15 +2,27 @@ import { router } from 'expo-router';
 import React, { useEffect } from 'react';
 import { Image, Platform, StyleSheet, Text, View } from 'react-native';
 import { Colors } from '../constants/theme';
+import { useAuth } from '../context/AuthContext';
 
 export default function SplashScreen() {
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      router.replace('/onboarding');
-    }, 3000); // 3 seconds delay
+  const { isAuthenticated, isLoading } = useAuth();
 
-    return () => clearTimeout(timer);
-  }, []);
+  useEffect(() => {
+    // Wait for auth to finish loading, then navigate
+    if (!isLoading) {
+      const timer = setTimeout(() => {
+        if (isAuthenticated) {
+          console.log('✅ User is authenticated, navigating to chat');
+          router.replace('/(tabs)/chat');
+        } else {
+          console.log('❌ User not authenticated, navigating to onboarding');
+          router.replace('/onboarding');
+        }
+      }, 2000); // 2 seconds delay for splash screen
+
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, isAuthenticated]);
 
   return (
     <View style={styles.container}>

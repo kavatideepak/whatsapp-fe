@@ -9,11 +9,13 @@ import {
   FlatList,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 // removed ThemedText import to avoid ambiguity
 import { ThemedView } from '../../components/themed-view'; // keep ThemedView if it returns a View
+import { TabHeader } from '../../components/tab-header';
 import { useAuth } from '../../context/AuthContext';
 import { createChat, getUsers } from '../../services/api';
 import { User } from '../../types/api';
@@ -31,6 +33,7 @@ export default function ContactsScreen() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [initiatingChat, setInitiatingChat] = React.useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = React.useState('');
 
   // Extract params.contacts to a stable value
   const paramsContacts = params.contacts as string | undefined;
@@ -91,7 +94,6 @@ export default function ContactsScreen() {
       
       // Call the API to create/get chat
       const response = await createChat(
-        currentUser.id,
         parseInt(item.id),
         false // is_group is false for individual chats
       );
@@ -117,6 +119,19 @@ export default function ContactsScreen() {
     }
   }
 
+  // Filter contacts based on search query
+  const filteredContacts = React.useMemo(() => {
+    if (!searchQuery.trim()) {
+      return contacts;
+    }
+    
+    const query = searchQuery.toLowerCase();
+    return contacts.filter(contact =>
+      contact.name.toLowerCase().includes(query) ||
+      contact.phone.toLowerCase().includes(query)
+    );
+  }, [contacts, searchQuery]);
+
   const renderItem = ({ item }: { item: Contact }) => {
     const isLoading = initiatingChat === item.id;
     
@@ -134,11 +149,11 @@ export default function ContactsScreen() {
             <Text style={styles.name}>{String(item.name ?? '')}</Text>
             <Text style={styles.phone}>{String(item.phone ?? '')}</Text>
           </View>
-          {isLoading ? (
+          {/* {isLoading ? (
             <ActivityIndicator size="small" color="#1A1A1A" />
           ) : (
             <Ionicons name="chevron-forward" size={20} color="#B2B2B2" />
-          )}
+          )} */}
         </View>
       </TouchableOpacity>
     );
@@ -146,8 +161,23 @@ export default function ContactsScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      {/* Use RN Text for header to avoid custom component issues */}
-      <Text style={styles.header}>Contacts</Text>
+      {/* Header */}
+      <TabHeader />
+
+      {/* Title */}
+      <Text style={styles.title}>Contacts</Text>
+
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <Ionicons name="search" size={20} color="#767779" />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search for a contact"
+          placeholderTextColor="#767779"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+      </View>
 
       {loading ? (
         <View style={styles.centerContent}>
@@ -159,7 +189,7 @@ export default function ContactsScreen() {
         </View>
       ) : (
         <FlatList
-          data={contacts}
+          data={filteredContacts}
           keyExtractor={(i) => i.id}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
@@ -177,15 +207,32 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-    paddingTop: 64,
-    paddingHorizontal: 12,
   },
-  header: {
-    fontSize: 22,
+  title: {
+    fontSize: 28,
     fontWeight: '700',
     color: '#1A1A1A',
-    marginBottom: 12,
-    textAlign: 'center',
+    marginBottom: 16,
+    paddingHorizontal: 16,
+    fontFamily: 'SF Pro Text',
+  },
+  searchContainer: {
+    height: 43,
+    backgroundColor: '#F4F4F4',
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  searchInput: {
+    flex: 1,
+    height: 43,
+    fontSize: 14,
+    fontFamily: 'SF Pro Text',
+    color: '#1A1A1A',
   },
   centerContent: {
     flex: 1,
@@ -198,19 +245,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   listContent: {
+    paddingHorizontal: 16,
     paddingBottom: 24,
   },
   contactRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 8,
     gap: 12,
   },
   avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: '#E6E6E6',
     justifyContent: 'center',
     alignItems: 'center',

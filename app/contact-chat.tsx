@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Dimensions,
   FlatList,
+  ImageBackground,
   StyleSheet,
   Text,
   TextInput,
@@ -146,6 +147,9 @@ export default function ContactChatScreen() {
     };
   }, [isConnected, contact?.id]);
 
+  // Note: Auto-scroll not needed with inverted FlatList
+  // Latest messages automatically appear at the bottom (which is now top in inverted mode)
+
   // Handle input change and typing indicator
   const handleInputChange = (text: string) => {
     setInput(text);
@@ -182,16 +186,19 @@ export default function ContactChatScreen() {
     sendMessage(input.trim(), 'text');
     setInput('');
 
-    // Scroll to bottom
-    setTimeout(
-      () => flatListRef.current?.scrollToEnd({ animated: true }),
-      100
-    );
+    // Scroll to bottom (index 0 in inverted list)
+    setTimeout(() => {
+      if (flatListRef.current && messages.length > 0) {
+        flatListRef.current.scrollToIndex({ index: 0, animated: true });
+      }
+    }, 100);
   };
 
   // Format timestamp
   const formatTime = (isoString: string): string => {
+    if (!isoString) return '';
     const date = new Date(isoString);
+    if (isNaN(date.getTime())) return '';
     return `${date.getHours().toString().padStart(2, '0')}:${date
       .getMinutes()
       .toString().padStart(2, '0')}`;
@@ -282,7 +289,9 @@ export default function ContactChatScreen() {
             <Text style={textStyle}>{item.content}</Text>
           )}
           <View style={styles.messageFooter}>
-            <Text style={styles.timeText}>{formatTime(item.created_at)}</Text>
+            <Text style={styles.timeText}>
+              {formatTime(item.sent_at || item.created_at || '')}
+            </Text>
             {renderStatus()}
           </View>
         </View>
@@ -297,8 +306,13 @@ return (
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Ionicons name="arrow-back" size={22} color="#1A1A1A" />
+            <Ionicons name="chevron-back" size={22} color="#1A1A1A" />
           </TouchableOpacity>
+
+          {/* Avatar */}
+          <View style={styles.avatar}>
+            <Ionicons name="person-circle-outline" size={40} color="#9A9A9A" />
+          </View>
 
           <View style={styles.headerTitle}>
             <Text style={styles.contactName}>
@@ -315,33 +329,58 @@ return (
             </Text>
           </View>
 
-          <View style={{ width: 44 }} />
+          <TouchableOpacity style={styles.menuBtn}>
+            <Ionicons name="ellipsis-horizontal" size={18} color="#1A1A1A" />
+          </TouchableOpacity>
         </View>
 
-        {/* Loading indicator */}
-        {isLoading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color="#1A1A1A" />
-            <Text style={styles.loadingText}>Loading messages...</Text>
-          </View>
-        )}
+        {/* Chat Background */}
+        <ImageBackground
+          source={require('@/assets/images/chat_bg.png')}
+          style={styles.chatBackground}
+          imageStyle={styles.chatBackgroundImage}
+          resizeMode="repeat"
+        >
+          {/* Loading indicator */}
+          {isLoading && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color="#1A1A1A" />
+              <Text style={styles.loadingText}>Loading messages...</Text>
+            </View>
+          )}
 
-        {/* Error message */}
-        {chatError && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{chatError}</Text>
-          </View>
-        )}
+          {/* Error message */}
+          {chatError && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{chatError}</Text>
+            </View>
+          )}
 
-        {/* Messages */}
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={(m) => String(m.id)}
-          renderItem={renderMessage}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-        />
+          {/* Messages */}
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            keyExtractor={(m) => String(m.id)}
+            renderItem={renderMessage}
+            contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
+            inverted // WhatsApp-style: renders from bottom, newest messages appear instantly
+            initialNumToRender={20} // Only render 20 messages initially for performance
+            maxToRenderPerBatch={10} // Render 10 items per batch when scrolling
+            windowSize={10} // Keep 10 screens worth of items in memory
+            removeClippedSubviews={true} // Unmount off-screen items for better performance
+            maintainVisibleContentPosition={{
+              minIndexForVisible: 0,
+              autoscrollToTopThreshold: 10,
+            }}
+            onScrollToIndexFailed={(info) => {
+              // Wait for list to render then try again
+              setTimeout(() => {
+                flatListRef.current?.scrollToIndex({ index: info.index, animated: true });
+              }, 100);
+            }}
+          />
+        </ImageBackground>
 
         {/* Input area */}
         <View style={styles.inputRow}>
@@ -378,6 +417,14 @@ const styles = StyleSheet.create({
     flex: 1,
     // backgroundColor: '#F7F7F7',
   },
+  chatBackground: {
+    flex: 1,
+    backgroundColor: '#F5F2EB',
+  },
+  chatBackgroundImage: {
+    opacity: 0.3,
+    resizeMode: 'contain',
+  },
   header: {
     height: 64,
     backgroundColor: '#FFFFFF',
@@ -391,6 +438,13 @@ const styles = StyleSheet.create({
     width: 44,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
   headerTitle: {
     flex: 1,
@@ -406,11 +460,23 @@ const styles = StyleSheet.create({
     color: '#767779',
     marginTop: 2,
   },
+  menuBtn: {
+    width: 28,
+       height: 28,
+    borderRadius: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+        backgroundColor: 'rgba(26, 26, 26, 0.08)',
+
+  },
 
   listContent: {
     paddingHorizontal: 12,
     paddingTop: 6,
     paddingBottom: 6, // leaves space for input area
+    fontFamily: 'SF Pro Text',
+    fontWeight: 400,
+    fontSize: 15.8,
   },
 
   messageRow: {

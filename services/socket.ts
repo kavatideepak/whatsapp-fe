@@ -185,10 +185,12 @@ export function markMessageRead(messageId: number, chatId: number): void {
  */
 export function bulkMarkMessagesRead(chatId: number, messageIds: number[]): void {
   if (!isSocketReady() || messageIds.length === 0) {
+    console.warn(`⚠️ Cannot bulk mark read: socketReady=${isSocketReady()}, messageIds=${messageIds.length}`);
     return;
   }
 
   console.log(`✓✓ Bulk marking ${messageIds.length} messages as read in chat ${chatId}`);
+  console.log(`✓✓ Message IDs:`, messageIds);
   socket?.emit('bulk_mark_read', { chat_id: chatId, message_ids: messageIds });
 }
 

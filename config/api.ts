@@ -4,11 +4,11 @@
  */
 
 // Base URL for the API
-// export const API_BASE_URL = 'http://192.168.0.8:3000/api';
-export const API_BASE_URL = 'http://localhost:3000/api';
+export const API_BASE_URL = 'http://192.168.29.6:3000/api';
+// export const API_BASE_URL = 'http://localhost:3000/api';
 
 // Socket URL (without /api path)
-export const SOCKET_URL = 'http://localhost:3000';
+export const SOCKET_URL = 'http://192.168.29.6:3000';
 
 // API Endpoints
 export const API_ENDPOINTS = {

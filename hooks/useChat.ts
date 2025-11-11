@@ -52,6 +52,7 @@ export function useChat(options: UseChatOptions): UseChatReturn {
   const [typingUsers, setTypingUsers] = useState<Set<number>>(new Set());
   const socketRef = useRef(getSocket());
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasMarkedAsReadRef = useRef<boolean>(false); // Flag to prevent duplicate marking
 
   /**
    * Load message history from API
@@ -59,6 +60,12 @@ export function useChat(options: UseChatOptions): UseChatReturn {
   const loadMessages = useCallback(async () => {
     if (!chatId || !token) {
       console.log('⚠️ Cannot load messages: missing chatId or token');
+      return;
+    }
+
+    // Prevent duplicate loading
+    if (isLoading) {
+      console.log('⚠️ Already loading messages, skipping...');
       return;
     }
 
@@ -81,19 +88,42 @@ export function useChat(options: UseChatOptions): UseChatReturn {
       }
 
       console.log(`📥 Loaded ${data.data.messages.length} messages for chat ${chatId}`);
-      setMessages(data.data.messages);
+      // Reverse messages for inverted FlatList (newest first for better performance)
+      setMessages(data.data.messages.reverse());
 
-      // Auto-mark unread messages from others as delivered
-      if (autoMarkDelivered && user?.id) {
-        const undeliveredFromOthers = data.data.messages.filter(
-          (msg) => msg.sender_id !== user.id && msg.status === 'sent'
+      // Auto-mark all unread messages as read when opening the chat (ONLY ONCE)
+      if (autoMarkRead && user?.id && !hasMarkedAsReadRef.current) {
+        const unreadFromOthers = data.data.messages.filter(
+          (msg) => msg.sender_id !== user.id && (msg.status === 'sent' || msg.status === 'delivered')
         );
         
-        undeliveredFromOthers.forEach((msg) => {
-          if (typeof msg.id === 'number') {
-            markMessageDelivered(msg.id);
-          }
-        });
+        const unreadMessageIds = unreadFromOthers
+          .map(msg => msg.id)
+          .filter((id): id is number => typeof id === 'number');
+        
+        if (unreadMessageIds.length > 0) {
+          console.log(`📖 Auto-marking ${unreadMessageIds.length} messages as read on chat load`);
+          console.log(`📖 Message IDs to mark as read:`, unreadMessageIds);
+          console.log(`📖 Chat ID:`, chatId);
+          console.log(`📖 Current user ID:`, user.id);
+          console.log(`📖 hasMarkedAsReadRef:`, hasMarkedAsReadRef.current);
+          
+          // Set flag BEFORE calling to prevent race condition
+          hasMarkedAsReadRef.current = true;
+          
+          bulkMarkMessagesRead(chatId, unreadMessageIds);
+          
+          // Update local state immediately
+          setMessages((prev) =>
+            prev.map((msg) =>
+              unreadMessageIds.includes(Number(msg.id)) ? { ...msg, status: 'read' } : msg
+            )
+          );
+        } else {
+          console.log(`📖 No unread messages to mark as read`);
+        }
+      } else if (hasMarkedAsReadRef.current) {
+        console.log(`📖 Skipping mark as read - already marked (flag=${hasMarkedAsReadRef.current})`);
       }
     } catch (err: any) {
       console.error('❌ Failed to load messages:', err);
@@ -128,12 +158,14 @@ export function useChat(options: UseChatOptions): UseChatReturn {
         sender_id: user.id,
         content: content.trim(),
         message_type: messageType,
+        sent_at: now,
         created_at: now,
         status: 'sending',
         tempId,
       };
 
-      setMessages((prev) => [...prev, tempMessage]);
+      // Add new message at the beginning (for inverted FlatList)
+      setMessages((prev) => [tempMessage, ...prev]);
 
       // Send via socket
       try {
@@ -240,7 +272,8 @@ export function useChat(options: UseChatOptions): UseChatReturn {
           if (exists) {
             return prev;
           }
-          return [...prev, { ...message, status: 'delivered' }];
+          // Add at beginning for inverted FlatList
+          return [{ ...message, status: 'delivered' }, ...prev];
         });
 
         // Auto-mark as delivered if from another user
@@ -250,9 +283,10 @@ export function useChat(options: UseChatOptions): UseChatReturn {
           }
         }
 
-        // Auto-mark as read if enabled
+        // Auto-mark as read if enabled (for new incoming messages)
         if (autoMarkRead && message.sender_id !== user?.id) {
           if (typeof message.id === 'number') {
+            console.log(`📖 Auto-marking new message ${message.id} as read`);
             bulkMarkMessagesRead(chatId, [message.id]);
           }
         }
@@ -271,6 +305,24 @@ export function useChat(options: UseChatOptions): UseChatReturn {
         prev.map((msg) => {
           if (Number(msg.id) === data.message_id) {
             return { ...msg, status: data.status };
+          }
+          return msg;
+        })
+      );
+    };
+
+    // Handle bulk message status updates (when someone marks multiple messages as read)
+    const handleBulkMessageStatusUpdated = (data: {
+      message_ids: number[];
+      user_id: number;
+      chat_id: number;
+    }) => {
+      console.log(`📊 Bulk status update: ${data.message_ids.length} messages by user ${data.user_id}`);
+
+      setMessages((prev) =>
+        prev.map((msg) => {
+          if (data.message_ids.includes(Number(msg.id))) {
+            return { ...msg, status: 'read' };
           }
           return msg;
         })
@@ -313,6 +365,7 @@ export function useChat(options: UseChatOptions): UseChatReturn {
     socket.on('message_sent', handleMessageSent);
     socket.on('new_message', handleNewMessage);
     socket.on('message_status_updated', handleMessageStatusUpdated);
+    socket.on('messages_read_bulk', handleBulkMessageStatusUpdated);
     socket.on('user_typing', handleUserTyping);
     socket.on('message_deleted', handleMessageDeleted);
 
@@ -321,6 +374,7 @@ export function useChat(options: UseChatOptions): UseChatReturn {
       socket.off('message_sent', handleMessageSent);
       socket.off('new_message', handleNewMessage);
       socket.off('message_status_updated', handleMessageStatusUpdated);
+      socket.off('messages_read_bulk', handleBulkMessageStatusUpdated);
       socket.off('user_typing', handleUserTyping);
       socket.off('message_deleted', handleMessageDeleted);
     };
@@ -331,9 +385,13 @@ export function useChat(options: UseChatOptions): UseChatReturn {
    */
   useEffect(() => {
     if (chatId) {
+      console.log(`🔄 Chat changed to ${chatId}, loading messages...`);
+      // Reset the flag when chat changes
+      hasMarkedAsReadRef.current = false;
       loadMessages();
     }
-  }, [chatId, loadMessages]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId]); // Only reload when chatId changes, not when loadMessages function changes
 
   /**
    * Cleanup typing timeout on unmount
