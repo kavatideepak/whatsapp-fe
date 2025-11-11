@@ -16,16 +16,21 @@ import {
 import { ThemedView } from '../components/themed-view';
 import { getUsers } from '../services/api';
 import { User } from '../types/api';
+import { useSocket } from '../hooks/useSocket';
+import { getPresenceInfo } from '../services/socket';
 
 type Contact = {
   id: string;
   name: string;
   phone: string;
   isAdded?: boolean; // already added in app
+  isOnline?: boolean;
+  lastSeen?: string;
 };
 
 export default function AddContactsScreen() {
   const router = useRouter();
+  const { socket } = useSocket();
   const [query, setQuery] = React.useState('');
   const [selected, setSelected] = React.useState<Record<string, boolean>>({});
   const [contacts, setContacts] = React.useState<Contact[]>([]);
@@ -46,6 +51,8 @@ export default function AddContactsScreen() {
           name: user.name || user.phone_number,
           phone: user.phone_number,
           isAdded: false, // You can implement logic to check if already added
+          isOnline: false,
+          lastSeen: undefined,
         }));
         
         setContacts(transformedContacts);
@@ -54,8 +61,8 @@ export default function AddContactsScreen() {
         setError('Failed to load contacts');
         // Fallback to sample data on error
         setContacts([
-          { id: '1', name: 'Aaron Josh', phone: '+91 9983655423' },
-          { id: '2', name: 'Aaaron Hilton', phone: '+91 9122849573' },
+          { id: '1', name: 'Aaron Josh', phone: '+91 9983655423', isOnline: false },
+          { id: '2', name: 'Aaaron Hilton', phone: '+91 9122849573', isOnline: false },
         ]);
       } finally {
         setLoading(false);
@@ -64,6 +71,71 @@ export default function AddContactsScreen() {
 
     fetchContacts();
   }, []);
+
+  // Request presence for all contacts when loaded
+  React.useEffect(() => {
+    if (!socket || contacts.length === 0) return;
+
+    console.log('📡 Requesting presence for', contacts.length, 'contacts');
+    console.log('📡 Contact IDs:', contacts.map(c => c.id));
+    
+    // Request presence for all contacts at once
+    const contactIds = contacts.map(contact => parseInt(contact.id));
+    console.log('📡 Requesting presence for IDs:', contactIds);
+    getPresenceInfo(contactIds);
+  }, [socket, contacts.length]);
+
+  // Listen for presence updates (separate effect to avoid dependency issues)
+  React.useEffect(() => {
+    if (!socket) return;
+
+    // Listen for presence updates
+    const handlePresenceUpdate = (data: { user_id: number; is_online: boolean; last_seen?: string }) => {
+      console.log('📊 Presence updated in contacts list:', data);
+      
+      setContacts(prevContacts => 
+        prevContacts.map(contact => 
+          contact.id === data.user_id.toString()
+            ? { ...contact, isOnline: data.is_online, lastSeen: data.last_seen }
+            : contact
+        )
+      );
+    };
+
+    const handlePresenceInfo = (data: Array<{ user_id: number; is_online: boolean; last_seen?: string }> | { user_id: number; is_online: boolean; last_seen?: string }) => {
+      console.log('📊 Presence info received in contacts list:', data);
+      
+      // Handle bulk presence info (array of users)
+      if (Array.isArray(data)) {
+        setContacts(prevContacts => 
+          prevContacts.map(contact => {
+            const presenceData = data.find(p => p.user_id === parseInt(contact.id));
+            if (presenceData) {
+              return { ...contact, isOnline: presenceData.is_online, lastSeen: presenceData.last_seen };
+            }
+            return contact;
+          })
+        );
+      } else {
+        // Handle single user presence info
+        setContacts(prevContacts => 
+          prevContacts.map(contact => 
+            contact.id === data.user_id.toString()
+              ? { ...contact, isOnline: data.is_online, lastSeen: data.last_seen }
+              : contact
+          )
+        );
+      }
+    };
+
+    socket.on('presence_updated', handlePresenceUpdate);
+    socket.on('presence_info', handlePresenceInfo);
+
+    return () => {
+      socket.off('presence_updated', handlePresenceUpdate);
+      socket.off('presence_info', handlePresenceInfo);
+    };
+  }, [socket]);
 
   // Derived filtered list
   const filtered = React.useMemo(() => {
@@ -87,6 +159,30 @@ export default function AddContactsScreen() {
 
   const renderItem = ({ item }: { item: Contact }) => {
     const isSelected = !!selected[item.id];
+    
+    // Format last seen like WhatsApp
+    const formatLastSeen = () => {
+      if (item.isOnline) return 'Online';
+      if (!item.lastSeen) return item.phone; // Show phone number if no presence data
+      
+      const lastSeenDate = new Date(item.lastSeen);
+      const now = new Date();
+      const diffMs = now.getTime() - lastSeenDate.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      
+      if (diffMins < 1) return 'Last seen just now';
+      if (diffMins < 60) return `Last seen ${diffMins} ${diffMins === 1 ? 'minute' : 'minutes'} ago`;
+      
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return `Last seen ${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
+      
+      const diffDays = Math.floor(diffHours / 24);
+      if (diffDays === 1) return 'Last seen yesterday';
+      if (diffDays < 7) return `Last seen ${diffDays} days ago`;
+      
+      return `Last seen ${lastSeenDate.toLocaleDateString()}`;
+    };
+    
     return (
       <View style={styles.contactRow}>
         <TouchableOpacity
@@ -109,7 +205,9 @@ export default function AddContactsScreen() {
             </Text>
             {item.isAdded && <Text style={styles.addedLabel}>Added</Text>}
           </View>
-          <Text style={styles.contactPhone}>{item.phone}</Text>
+          <Text style={[styles.contactPhone, item.isOnline && styles.onlineText]}>
+            {formatLastSeen()}
+          </Text>
         </View>
       </View>
     );
@@ -308,6 +406,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#767779',
     fontFamily: 'SF Pro Text',
+  },
+  onlineText: {
+    color: '#25D366', // WhatsApp green for online status
   },
   separator: {
     height: 1,

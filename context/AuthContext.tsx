@@ -6,6 +6,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { clearAuthToken, getAuthToken, getUserData, storeAuthData } from '../services/api';
 import { User } from '../types/api';
+import { initializeSocket, disconnectSocket } from '../services/socket';
 
 interface AuthContextType {
   user: User | null;
@@ -40,6 +41,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setToken(storedToken);
       setUser(storedUser);
+      
+      // Initialize socket if user is authenticated
+      if (storedUser?.id) {
+        console.log('🔐 Initializing socket for logged-in user:', storedUser.id);
+        initializeSocket(storedUser.id);
+      }
     } catch (error) {
       console.error('Failed to load auth data:', error);
     } finally {
@@ -52,6 +59,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await storeAuthData(newToken, newUser);
       setToken(newToken);
       setUser(newUser);
+      
+      // Initialize socket connection on login
+      if (newUser?.id) {
+        console.log('🔐 User logged in, initializing socket:', newUser.id);
+        initializeSocket(newUser.id);
+      }
     } catch (error) {
       console.error('Failed to login:', error);
       throw error;
@@ -60,6 +73,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
+      // Disconnect socket before logout
+      console.log('🔌 User logging out, disconnecting socket');
+      disconnectSocket();
+      
       await clearAuthToken();
       setToken(null);
       setUser(null);

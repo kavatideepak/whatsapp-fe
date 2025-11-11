@@ -6,6 +6,8 @@
 import { API_ENDPOINTS, buildUrl } from '@/config/api';
 import {
   ApiError,
+  CreateChatRequest,
+  CreateChatResponse,
   GetUsersResponse,
   RequestOtpRequest,
   RequestOtpResponse,
@@ -221,4 +223,60 @@ export async function isAuthenticated(): Promise<boolean> {
   } catch (error) {
     return false;
   }
+}
+
+/**
+ * Create a new chat between two users
+ */
+export async function createChat(
+  userId: number,
+  otherUserId: number,
+  isGroup: boolean = false
+): Promise<CreateChatResponse> {
+  const token = await getAuthToken();
+  
+  if (!token) {
+    throw {
+      error: 'Unauthorized',
+      message: 'Authentication token not found',
+      statusCode: 401,
+    } as ApiError;
+  }
+
+  const body: CreateChatRequest = {
+    user_id: userId,
+    other_user_id: otherUserId,
+    is_group: isGroup,
+  };
+
+  return fetchApi<CreateChatResponse>(API_ENDPOINTS.chats.create, {
+    method: 'POST',
+    body: JSON.stringify(body),
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+}
+
+/**
+ * Get all chats for a user
+ */
+export async function getChats(userId: number): Promise<any> {
+  const token = await getAuthToken();
+  
+  if (!token) {
+    throw {
+      error: 'Unauthorized',
+      message: 'Authentication token not found',
+      statusCode: 401,
+    } as ApiError;
+  }
+
+  return fetchApi<any>(`${API_ENDPOINTS.chats.list}?user_id=${userId}`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+    },
+  });
 }

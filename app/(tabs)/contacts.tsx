@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   FlatList,
   StyleSheet,
@@ -13,7 +14,8 @@ import {
 } from 'react-native';
 // removed ThemedText import to avoid ambiguity
 import { ThemedView } from '../../components/themed-view'; // keep ThemedView if it returns a View
-import { getUsers } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import { createChat, getUsers } from '../../services/api';
 import { User } from '../../types/api';
 interface Contact {
   id: string;
@@ -24,9 +26,11 @@ interface Contact {
 export default function ContactsScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
+  const { user: currentUser } = useAuth();
   const [contacts, setContacts] = React.useState<Contact[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
+  const [initiatingChat, setInitiatingChat] = React.useState<string | null>(null);
 
   // Extract params.contacts to a stable value
   const paramsContacts = params.contacts as string | undefined;
@@ -76,27 +80,69 @@ export default function ContactsScreen() {
     }
   }, [paramsContacts]);
 
-  function openChat(item: Contact) {
-    router.push({
-      pathname: '/contact-chat',
-      params: { contact: JSON.stringify(item) },
-    });
+  async function openChat(item: Contact) {
+    if (!currentUser?.id) {
+      Alert.alert('Error', 'Please log in to start a chat');
+      return;
+    }
+
+    try {
+      setInitiatingChat(item.id);
+      
+      // Call the API to create/get chat
+      const response = await createChat(
+        currentUser.id,
+        parseInt(item.id),
+        false // is_group is false for individual chats
+      );
+
+      console.log('Chat created/retrieved:', response.data.chat);
+
+      // Navigate to chat screen with chat info
+      router.push({
+        pathname: '/contact-chat',
+        params: { 
+          contact: JSON.stringify(item),
+          chatId: response.data.chat.id.toString(),
+        },
+      });
+    } catch (err: any) {
+      console.error('Failed to initiate chat:', err);
+      Alert.alert(
+        'Error',
+        err?.message || 'Failed to start chat. Please try again.'
+      );
+    } finally {
+      setInitiatingChat(null);
+    }
   }
 
-  const renderItem = ({ item }: { item: Contact }) => (
-    <TouchableOpacity onPress={() => openChat(item)} activeOpacity={0.8}>
-      <View style={styles.contactRow}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{String(item.name?.charAt(0) ?? '')}</Text>
+  const renderItem = ({ item }: { item: Contact }) => {
+    const isLoading = initiatingChat === item.id;
+    
+    return (
+      <TouchableOpacity 
+        onPress={() => openChat(item)} 
+        activeOpacity={0.8}
+        disabled={isLoading}
+      >
+        <View style={styles.contactRow}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{String(item.name?.charAt(0) ?? '')}</Text>
+          </View>
+          <View style={styles.info}>
+            <Text style={styles.name}>{String(item.name ?? '')}</Text>
+            <Text style={styles.phone}>{String(item.phone ?? '')}</Text>
+          </View>
+          {isLoading ? (
+            <ActivityIndicator size="small" color="#1A1A1A" />
+          ) : (
+            <Ionicons name="chevron-forward" size={20} color="#B2B2B2" />
+          )}
         </View>
-        <View style={styles.info}>
-          <Text style={styles.name}>{String(item.name ?? '')}</Text>
-          <Text style={styles.phone}>{String(item.phone ?? '')}</Text>
-        </View>
-        <Ionicons name="chevron-forward" size={20} color="#B2B2B2" />
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <ThemedView style={styles.container}>

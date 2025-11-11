@@ -63,6 +63,78 @@ export interface UpdateUserResponse {
   user: User;
 }
 
+// Create Chat
+export interface CreateChatRequest {
+  user_id: number;
+  other_user_id: number;
+  is_group: boolean;
+}
+
+export interface Chat {
+  id: number;
+  is_group: boolean;
+  created_by: number;
+  created_at: string;
+}
+
+export interface CreateChatResponse {
+  success: boolean;
+  message: string;
+  data: {
+    chat: Chat;
+  };
+}
+
+// Message Types
+export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
+export type MessageType = 'text' | 'image' | 'file' | 'audio' | 'video';
+
+export interface Message {
+  id: string | number;
+  chat_id: number;
+  sender_id: number;
+  content: string;
+  message_type: MessageType;
+  created_at: string;
+  status?: MessageStatus;
+  is_deleted?: boolean;
+  tempId?: string; // For optimistic UI updates
+}
+
+export interface SendMessageRequest {
+  chat_id: number;
+  content: string;
+  message_type?: MessageType;
+  tempId?: string;
+}
+
+export interface GetMessagesResponse {
+  success: boolean;
+  message: string;
+  data: {
+    messages: Message[];
+    count: number;
+  };
+}
+
+// Socket Events
+export interface SocketJoinChatPayload {
+  chatId: number;
+}
+
+export interface SocketMessageSentPayload {
+  tempId?: string;
+  message: Message;
+}
+
+export interface SocketNewMessagePayload {
+  message: Message;
+}
+
+export interface SocketMessageDeliveredPayload {
+  message_id: number;
+}
+
 // Generic API Error
 export interface ApiError {
   error: string;

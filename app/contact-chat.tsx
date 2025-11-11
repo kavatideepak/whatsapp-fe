@@ -1,16 +1,21 @@
 // app/contact-chat.tsx
 import KeyboardAvoidingWrapper from '@/components/keyboard-avoiding-wrapper';
+import { useAuth } from '@/context/AuthContext';
+import { useChat } from '@/hooks/useChat';
+import { useSocket } from '@/hooks/useSocket';
+import { Message as MessageType } from '@/types/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React from 'react';
 import {
-    Dimensions,
-    FlatList,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View
+  ActivityIndicator,
+  Dimensions,
+  FlatList,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedView } from '../components/themed-view';
@@ -25,34 +30,18 @@ type Contact = {
   phone: string;
 };
 
-type Message = {
-  id: string;
-  text: string;
-  fromMe: boolean;
-  time: string;
+type ChatParams = {
+  contact?: string;
+  chatId?: string;
 };
 
-const SAMPLE_TEXTS = [
-  'Hi! How are you doing today?',
-  "I checked the records — looks fine.",
-  "Do you need the report?",
-  "I'll send it by EOD.",
-  "Perfect, thank you!",
-  "Let's touch base tomorrow.",
-  "Noted. I'll follow up.",
-  "Great — that helps a lot.",
-  "Can you share the file?",
-  "On it now.",
-  "Looks good to me.",
-  "Please review and confirm.",
-  "Awesome 😄",
-  "Will do.",
-  "See you soon!",
-];
-
 export default function ContactChatScreen() {
-  const params = useLocalSearchParams();
+  const params = useLocalSearchParams<ChatParams>();
   const router = useRouter();
+  const { user } = useAuth();
+
+  // Initialize socket connection
+  const { isConnected, isAuthenticated } = useSocket();
 
   const contact: Contact | null = React.useMemo(() => {
     if (params.contact) {
@@ -63,71 +52,239 @@ export default function ContactChatScreen() {
       }
     }
     return null;
-  }, [params]);
+  }, [params.contact]);
 
-  // 🟢 messages state
-  const [messages, setMessages] = React.useState<Message[]>(() =>
-    Array.from({ length: 15 }).map((_, idx) => {
-      const text = SAMPLE_TEXTS[idx % SAMPLE_TEXTS.length];
-      const fromMe = idx % 2 === 0;
-      const hour = 8 + Math.floor(idx / 2);
-      const minute = (10 + idx * 3) % 60;
-      const time = `${hour.toString().padStart(2, '0')}:${minute
-        .toString()
-        .padStart(2, '0')}`;
-      return { id: String(idx + 1), text, fromMe, time };
-    }).reverse()
-  );
+  const chatId = params.chatId ? parseInt(params.chatId) : null;
+
+  // Use chat hook for messaging functionality
+  const {
+    messages,
+    isLoading,
+    error: chatError,
+    sendMessage,
+    markAsRead,
+    setTyping,
+    typingUsers,
+  } = useChat({
+    chatId,
+    autoMarkDelivered: true,
+    autoMarkRead: true, // Auto-mark messages as read in this chat
+  });
 
   const [input, setInput] = React.useState('');
+  const [recipientPresence, setRecipientPresence] = React.useState<{
+    is_online: boolean;
+    last_seen?: string;
+  }>({ is_online: false });
   const flatListRef = React.useRef<FlatList>(null);
+  const typingTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 🟢 handle send
+  // Show connection status
+  React.useEffect(() => {
+    console.log('🔌 Socket status:', {
+      isConnected,
+      isAuthenticated,
+      chatId,
+    });
+  }, [isConnected, isAuthenticated, chatId]);
+
+  // Listen for presence updates from socket
+  React.useEffect(() => {
+    if (!isConnected || !contact?.id) {
+      return;
+    }
+
+    const socket = require('@/services/socket').getSocket();
+    if (!socket) return;
+
+    // Request presence info for the contact
+    const { getPresenceInfo } = require('@/services/socket');
+    getPresenceInfo([parseInt(contact.id)]);
+
+    // Listen for presence updates
+    const handlePresenceUpdated = (data: {
+      user_id: number;
+      is_online: boolean;
+      last_seen?: string;
+    }) => {
+      if (data.user_id === parseInt(contact.id)) {
+        console.log('📊 Presence updated for contact:', {
+          user_id: data.user_id,
+          is_online: data.is_online,
+          last_seen: data.last_seen,
+        });
+        setRecipientPresence({
+          is_online: data.is_online,
+          last_seen: data.last_seen,
+        });
+      }
+    };
+
+    const handlePresenceInfo = (presenceData: Array<{
+      user_id: number;
+      is_online: boolean;
+      last_seen?: string;
+    }>) => {
+      const contactPresence = presenceData.find(
+        (p) => p.user_id === parseInt(contact.id)
+      );
+      if (contactPresence) {
+        console.log('📊 Presence info received:', contactPresence);
+        setRecipientPresence({
+          is_online: contactPresence.is_online,
+          last_seen: contactPresence.last_seen,
+        });
+      }
+    };
+
+    socket.on('presence_updated', handlePresenceUpdated);
+    socket.on('presence_info', handlePresenceInfo);
+
+    return () => {
+      socket.off('presence_updated', handlePresenceUpdated);
+      socket.off('presence_info', handlePresenceInfo);
+    };
+  }, [isConnected, contact?.id]);
+
+  // Handle input change and typing indicator
+  const handleInputChange = (text: string) => {
+    setInput(text);
+
+    // Send typing indicator
+    if (text.length > 0) {
+      setTyping(true);
+
+      // Clear existing timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+
+      // Stop typing after 2 seconds of inactivity
+      typingTimeoutRef.current = setTimeout(() => {
+        setTyping(false);
+      }, 2000);
+    } else {
+      setTyping(false);
+    }
+  };
+
+  // Handle send message
   const handleSend = () => {
     if (!input.trim()) return;
 
-    const now = new Date();
-    const time = `${now.getHours().toString().padStart(2, '0')}:${now
-      .getMinutes()
-      .toString()
-      .padStart(2, '0')}`;
+    // Stop typing indicator
+    setTyping(false);
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
 
-    const newMsg: Message = {
-      id: (messages.length + 1).toString(),
-      text: input.trim(),
-      fromMe: true,
-      time,
-    };
-
-    setMessages((prev) => [newMsg, ...prev]); // prepend because list is inverted
+    // Send message via socket
+    sendMessage(input.trim(), 'text');
     setInput('');
 
-    // Scroll to bottom (newest message)
-    setTimeout(() => flatListRef.current?.scrollToOffset({ offset: 0, animated: true }), 50);
+    // Scroll to bottom
+    setTimeout(
+      () => flatListRef.current?.scrollToEnd({ animated: true }),
+      100
+    );
   };
 
-  const renderMessage = ({ item }: { item: Message }) => {
+  // Format timestamp
+  const formatTime = (isoString: string): string => {
+    const date = new Date(isoString);
+    return `${date.getHours().toString().padStart(2, '0')}:${date
+      .getMinutes()
+      .toString().padStart(2, '0')}`;
+  };
+
+  // Format last seen
+  const formatLastSeen = (): string => {
+    // Always show "Online" if user is connected (regardless of screen)
+    if (recipientPresence.is_online) {
+      return 'Online';
+    }
+    
+    if (!recipientPresence.last_seen) {
+      return 'Offline';
+    }
+
+    const lastSeen = new Date(recipientPresence.last_seen);
+    const now = new Date();
+    const diffMs = now.getTime() - lastSeen.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    // If less than 1 minute ago and not online, still show time
+    if (diffMins < 1) return 'Last seen just now';
+    if (diffMins < 60) return `Last seen ${diffMins}m ago`;
+    if (diffHours < 24) return `Last seen ${diffHours}h ago`;
+    if (diffDays === 1) return 'Last seen yesterday';
+    return `Last seen ${diffDays}d ago`;
+  };
+
+  const renderMessage = ({ item }: { item: MessageType }) => {
+    const isFromMe = item.sender_id === user?.id;
     const bubbleStyle = [
       styles.bubble,
-      item.fromMe ? styles.bubbleRight : styles.bubbleLeft,
+      isFromMe ? styles.bubbleRight : styles.bubbleLeft,
     ];
     const textStyle = [
       styles.bubbleText,
-      item.fromMe ? styles.textRight : styles.textLeft,
+      isFromMe ? styles.textRight : styles.textLeft,
     ];
+
+    // Render message status icon (WhatsApp-like)
+    const renderStatus = () => {
+      if (!isFromMe) return null;
+
+      switch (item.status) {
+        case 'sending':
+          return <Ionicons name="time-outline" size={14} color="#9A9A9A" />;
+        case 'sent':
+          return <Ionicons name="checkmark" size={14} color="#9A9A9A" />;
+        case 'delivered':
+          return (
+            <View style={{ flexDirection: 'row', marginLeft: -4 }}>
+              <Ionicons name="checkmark" size={14} color="#9A9A9A" />
+              <Ionicons name="checkmark" size={14} color="#9A9A9A" style={{ marginLeft: -8 }} />
+            </View>
+          );
+        case 'read':
+          return (
+            <View style={{ flexDirection: 'row', marginLeft: -4 }}>
+              <Ionicons name="checkmark" size={14} color="#4FC3F7" />
+              <Ionicons name="checkmark" size={14} color="#4FC3F7" style={{ marginLeft: -8 }} />
+            </View>
+          );
+        case 'failed':
+          return <Ionicons name="alert-circle" size={14} color="#F44336" />;
+        default:
+          return null;
+      }
+    };
 
     return (
       <View
         style={[
           styles.messageRow,
-          item.fromMe
+          isFromMe
             ? { justifyContent: 'flex-end' }
             : { justifyContent: 'flex-start' },
         ]}
       >
         <View style={bubbleStyle}>
-          <Text style={textStyle}>{item.text}</Text>
-          <Text style={styles.timeText}>{item.time}</Text>
+          {item.is_deleted ? (
+            <Text style={[textStyle, { fontStyle: 'italic', opacity: 0.6 }]}>
+              {item.content}
+            </Text>
+          ) : (
+            <Text style={textStyle}>{item.content}</Text>
+          )}
+          <View style={styles.messageFooter}>
+            <Text style={styles.timeText}>{formatTime(item.created_at)}</Text>
+            {renderStatus()}
+          </View>
         </View>
       </View>
     );
@@ -147,19 +304,41 @@ return (
             <Text style={styles.contactName}>
               {contact?.name ?? 'Unknown'}
             </Text>
-            <Text style={styles.contactSub}>{contact?.phone ?? ''}</Text>
+            <Text style={styles.contactSub}>
+              {!isConnected
+                ? 'Connecting...'
+                : !isAuthenticated
+                ? 'Authenticating...'
+                : typingUsers.size > 0
+                ? 'Typing...'
+                : formatLastSeen()}
+            </Text>
           </View>
 
           <View style={{ width: 44 }} />
         </View>
 
+        {/* Loading indicator */}
+        {isLoading && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color="#1A1A1A" />
+            <Text style={styles.loadingText}>Loading messages...</Text>
+          </View>
+        )}
+
+        {/* Error message */}
+        {chatError && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{chatError}</Text>
+          </View>
+        )}
+
         {/* Messages */}
         <FlatList
           ref={flatListRef}
           data={messages}
-          keyExtractor={(m) => m.id}
+          keyExtractor={(m) => String(m.id)}
           renderItem={renderMessage}
-          inverted
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
         />
@@ -172,11 +351,16 @@ return (
               placeholder="Message..."
               placeholderTextColor="#9A9A9A"
               value={input}
-              onChangeText={setInput}
+              onChangeText={handleInputChange}
               multiline
+              editable={isConnected && isAuthenticated}
             />
           </View>
-          <TouchableOpacity style={styles.sendBtn} onPress={handleSend}>
+          <TouchableOpacity
+            style={[styles.sendBtn, (!isConnected || !isAuthenticated || !input.trim()) && styles.sendBtnDisabled]}
+            onPress={handleSend}
+            disabled={!isConnected || !isAuthenticated || !input.trim()}
+          >
             <Ionicons name="send" size={20} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
@@ -258,10 +442,45 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   timeText: {
-    marginTop: 6,
     fontSize: 11,
     color: '#9A9A9A',
-    textAlign: 'right',
+  },
+  messageFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  statusText: {
+    fontSize: 11,
+    color: '#9A9A9A',
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    gap: 8,
+  },
+  loadingText: {
+    fontSize: 13,
+    color: '#767779',
+  },
+  errorContainer: {
+    backgroundColor: '#FFE5E5',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginHorizontal: 12,
+    marginTop: 8,
+    borderRadius: 8,
+  },
+  errorText: {
+    fontSize: 13,
+    color: '#D32F2F',
+    textAlign: 'center',
+  },
+  sendBtnDisabled: {
+    opacity: 0.5,
   },
 
   inputRow: {

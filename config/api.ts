@@ -4,7 +4,11 @@
  */
 
 // Base URL for the API
-export const API_BASE_URL = 'http://192.168.29.6:3000/api';
+// export const API_BASE_URL = 'http://192.168.0.8:3000/api';
+export const API_BASE_URL = 'http://localhost:3000/api';
+
+// Socket URL (without /api path)
+export const SOCKET_URL = 'http://localhost:3000';
 
 // API Endpoints
 export const API_ENDPOINTS = {
@@ -15,11 +19,16 @@ export const API_ENDPOINTS = {
     update: '/users/update',
     list: '/users',
   },
+  // Chats
+  chats: {
+    create: '/chats',
+    list: '/chats',
+  },
+  // Messages
+  messages: {
+    list: (chatId: number) => `/messages/${chatId}`,
+  },
   // Add more endpoint categories as needed
-  // messages: {
-  //   send: '/messages/send',
-  //   list: '/messages/list',
-  // },
 } as const;
 
 // Helper function to build full URL
