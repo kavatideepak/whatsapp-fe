@@ -5,10 +5,12 @@ import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { getChats } from '@/services/api';
 import { useFocusEffect } from '@react-navigation/native';
+import { useSocket } from '@/hooks/useSocket';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const [totalUnreadCount, setTotalUnreadCount] = React.useState(0);
+  const { socket, isConnected } = useSocket();
 
   // Fetch total unread count
   const fetchUnreadCount = React.useCallback(async () => {
@@ -36,6 +38,32 @@ export default function TabLayout() {
       fetchUnreadCount();
     }, [fetchUnreadCount])
   );
+
+  // Listen for socket events to update badge count in real-time
+  React.useEffect(() => {
+    if (!socket || !isConnected) return;
+
+    const handleNewMessage = () => {
+      console.log('📩 New message received, updating badge count...');
+      fetchUnreadCount();
+    };
+
+    const handleMessageRead = () => {
+      console.log('👁️ Messages marked as read, updating badge count...');
+      fetchUnreadCount();
+    };
+
+    // Listen for new messages and read events
+    socket.on('new_message', handleNewMessage);
+    socket.on('message_read', handleMessageRead);
+    socket.on('messages_read', handleMessageRead);
+
+    return () => {
+      socket.off('new_message', handleNewMessage);
+      socket.off('message_read', handleMessageRead);
+      socket.off('messages_read', handleMessageRead);
+    };
+  }, [socket, isConnected, fetchUnreadCount]);
 
   return (
     <Tabs
