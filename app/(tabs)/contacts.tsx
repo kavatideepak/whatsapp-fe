@@ -17,12 +17,18 @@ import {
 import { ThemedView } from '../../components/themed-view'; // keep ThemedView if it returns a View
 import { TabHeader } from '../../components/tab-header';
 import { useAuth } from '../../context/AuthContext';
-import { createChat, getUsers } from '../../services/api';
+import { createChat, getUserContacts } from '../../services/api';
 import { User } from '../../types/api';
+
 interface Contact {
-  id: string;
+  id: number;
   name: string;
-  phone: string;
+  phone_number: string;
+  email?: string;
+  department?: string;
+  job_title?: string;
+  profile_pic?: string;
+  added_at?: string;
 }
 
 export default function ContactsScreen() {
@@ -32,56 +38,30 @@ export default function ContactsScreen() {
   const [contacts, setContacts] = React.useState<Contact[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [initiatingChat, setInitiatingChat] = React.useState<string | null>(null);
+  const [initiatingChat, setInitiatingChat] = React.useState<number | null>(null);
   const [searchQuery, setSearchQuery] = React.useState('');
 
-  // Extract params.contacts to a stable value
-  const paramsContacts = params.contacts as string | undefined;
-
-  // Fetch users from API only once on mount
+  // Fetch user's added contacts from API
   React.useEffect(() => {
     async function fetchContacts() {
       try {
         setLoading(true);
         setError(null);
-        const response = await getUsers();
+        const response = await getUserContacts();
         
-        // Transform API users to Contact format
-        const transformedContacts: Contact[] = response.data.users.map((user: User) => ({
-          id: user.id.toString(),
-          name: user.name || user.phone_number,
-          phone: user.phone_number,
-        }));
-        
-        setContacts(transformedContacts);
+        // Contacts are already in the correct format from the API
+        setContacts(response.data.contacts);
       } catch (err) {
         console.error('Failed to fetch contacts:', err);
         setError('Failed to load contacts');
-        // Fallback to sample data on error
-        setContacts([
-          { id: '1', name: 'Aaron Josh', phone: '+91 9983655423' },
-          { id: '2', name: 'Aaaron Hilton', phone: '+91 9122849573' },
-        ]);
+        setContacts([]);
       } finally {
         setLoading(false);
       }
     }
 
     fetchContacts();
-  }, []); // Empty dependency array - fetch only once
-
-  // Handle params separately to avoid re-fetching
-  React.useEffect(() => {
-    if (paramsContacts) {
-      try {
-        const passedContacts = JSON.parse(paramsContacts) as Contact[];
-        setContacts(passedContacts);
-        setLoading(false);
-      } catch (err) {
-        console.error('Failed to parse passed contacts:', err);
-      }
-    }
-  }, [paramsContacts]);
+  }, []);
 
   async function openChat(item: Contact) {
     if (!currentUser?.id) {
@@ -94,7 +74,7 @@ export default function ContactsScreen() {
       
       // Call the API to create/get chat
       const response = await createChat(
-        parseInt(item.id),
+        item.id, // Already a number
         false // is_group is false for individual chats
       );
 
@@ -104,7 +84,11 @@ export default function ContactsScreen() {
       router.push({
         pathname: '/contact-chat',
         params: { 
-          contact: JSON.stringify(item),
+          contact: JSON.stringify({
+            id: item.id.toString(),
+            name: item.name,
+            phone: item.phone_number
+          }),
           chatId: response.data.chat.id.toString(),
         },
       });
@@ -128,7 +112,9 @@ export default function ContactsScreen() {
     const query = searchQuery.toLowerCase();
     return contacts.filter(contact =>
       contact.name.toLowerCase().includes(query) ||
-      contact.phone.toLowerCase().includes(query)
+      contact.phone_number.toLowerCase().includes(query) ||
+      contact.email?.toLowerCase().includes(query) ||
+      contact.department?.toLowerCase().includes(query)
     );
   }, [contacts, searchQuery]);
 
@@ -147,7 +133,10 @@ export default function ContactsScreen() {
           </View>
           <View style={styles.info}>
             <Text style={styles.name}>{String(item.name ?? '')}</Text>
-            <Text style={styles.phone}>{String(item.phone ?? '')}</Text>
+            <Text style={styles.phone}>{String(item.phone_number ?? '')}</Text>
+            {item.department && (
+              <Text style={styles.department}>{item.department}</Text>
+            )}
           </View>
           {/* {isLoading ? (
             <ActivityIndicator size="small" color="#1A1A1A" />
@@ -187,10 +176,27 @@ export default function ContactsScreen() {
         <View style={styles.centerContent}>
           <Text style={styles.errorText}>{error}</Text>
         </View>
+      ) : filteredContacts.length === 0 ? (
+        <View style={styles.centerContent}>
+          <Ionicons name="people-outline" size={64} color="#D0D0D0" />
+          <Text style={styles.emptyTitle}>No contacts yet</Text>
+          <Text style={styles.emptySubtext}>
+            {searchQuery ? 'No contacts match your search' : 'Add contacts from your company directory to start chatting'}
+          </Text>
+          {!searchQuery && (
+            <TouchableOpacity 
+              style={styles.addButton}
+              onPress={() => router.push('/add-contacts')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.addButtonText}>Add Contacts</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       ) : (
         <FlatList
           data={filteredContacts}
-          keyExtractor={(i) => i.id}
+          keyExtractor={(i) => i.id.toString()}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
@@ -280,6 +286,39 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontSize: 13,
     color: '#767779',
+  },
+  department: {
+    marginTop: 1,
+    fontSize: 12,
+    color: '#999',
+    fontStyle: 'italic',
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#767779',
+    marginTop: 8,
+    textAlign: 'center',
+    lineHeight: 20,
+    paddingHorizontal: 32,
+  },
+  addButton: {
+    marginTop: 24,
+    backgroundColor: '#1A1A1A',
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 24,
+  },
+  addButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   sep: {
     height: 1,

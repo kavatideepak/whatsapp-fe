@@ -11,7 +11,8 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSContactsUsageDescription": "Synapse needs access to your contacts to help you connect with your teammates who are already using the app."
+        "NSContactsUsageDescription": "Synapse needs access to your contacts to help you connect with your teammates who are already using the app.",
+        "NSContactsWriteUsageDescription": "Synapse needs permission to save your teammates to your phone's contacts for easy calling and messaging."
       }
     },
     "android": {
@@ -25,7 +26,8 @@
       "predictiveBackGestureEnabled": false,
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
-        "READ_CONTACTS"
+        "READ_CONTACTS",
+        "WRITE_CONTACTS"
       ]
     },
     "web": {

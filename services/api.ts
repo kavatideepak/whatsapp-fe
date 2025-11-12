@@ -278,3 +278,97 @@ export async function getChats(): Promise<any> {
     },
   });
 }
+
+/**
+ * Get all corporate contacts (company directory)
+ */
+export async function getCorporateContacts(): Promise<any> {
+  const token = await getAuthToken();
+  
+  if (!token) {
+    throw {
+      error: 'Unauthorized',
+      message: 'Authentication token not found',
+      statusCode: 401,
+    } as ApiError;
+  }
+
+  return fetchApi<any>('/contacts/corporate', {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+}
+
+/**
+ * Match device phone numbers with corporate contacts
+ */
+export async function matchContacts(phoneNumbers: string[]): Promise<any> {
+  const token = await getAuthToken();
+  
+  if (!token) {
+    throw {
+      error: 'Unauthorized',
+      message: 'Authentication token not found',
+      statusCode: 401,
+    } as ApiError;
+  }
+
+  return fetchApi<any>('/contacts/match', {
+    method: 'POST',
+    body: JSON.stringify({ phone_numbers: phoneNumbers }),
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+}
+
+/**
+ * Get user's added contacts
+ */
+export async function getUserContacts(): Promise<any> {
+  const token = await getAuthToken();
+  
+  if (!token) {
+    throw {
+      error: 'Unauthorized',
+      message: 'Authentication token not found',
+      statusCode: 401,
+    } as ApiError;
+  }
+
+  return fetchApi<any>('/contacts', {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+}
+
+/**
+ * Add corporate contacts to user's list
+ */
+export async function addCorporateContacts(corporateContactIds: number[]): Promise<any> {
+  const token = await getAuthToken();
+  
+  if (!token) {
+    throw {
+      error: 'Unauthorized',
+      message: 'Authentication token not found',
+      statusCode: 401,
+    } as ApiError;
+  }
+
+  return fetchApi<any>('/contacts/bulk', {
+    method: 'POST',
+    body: JSON.stringify({ corporate_contact_ids: corporateContactIds }),
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+  });
+}
