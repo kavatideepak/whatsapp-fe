@@ -13,6 +13,7 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
+import * as Contacts from 'expo-contacts';
 import { ThemedView } from '../components/themed-view';
 import { getUsers } from '../services/api';
 import { User } from '../types/api';
@@ -26,6 +27,8 @@ type Contact = {
   isAdded?: boolean; // already added in app
   isOnline?: boolean;
   lastSeen?: string;
+  isDeviceContact?: boolean; // from device contacts
+  isRegistered?: boolean; // registered on the app
 };
 
 export default function AddContactsScreen() {
@@ -37,50 +40,139 @@ export default function AddContactsScreen() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
-  // Fetch users from API
+  // Normalize phone number for comparison
+  const normalizePhone = (phone: string): string => {
+    return phone.replace(/[\s\-\(\)]/g, '').replace(/^\+/, '');
+  };
+
+  // Fetch device contacts and merge with app users
   React.useEffect(() => {
-    async function fetchContacts() {
+    async function fetchAndMergeContacts() {
       try {
         setLoading(true);
         setError(null);
+
+        // Fetch app users
         const response = await getUsers();
+        const appUsers: User[] = response.data.users;
+
+        // Create a map of app users by normalized phone number
+        const appUsersMap = new Map<string, User>();
+        appUsers.forEach(user => {
+          const normalizedPhone = normalizePhone(user.phone_number);
+          appUsersMap.set(normalizedPhone, user);
+        });
+
+        // Fetch device contacts if permission granted
+        const { status } = await Contacts.getPermissionsAsync();
+        let deviceContacts: Contacts.Contact[] = [];
         
-        // Transform API users to Contact format
-        const transformedContacts: Contact[] = response.data.users.map((user: User) => ({
-          id: user.id.toString(),
-          name: user.name || user.phone_number,
-          phone: user.phone_number,
-          isAdded: false, // You can implement logic to check if already added
-          isOnline: false,
-          lastSeen: undefined,
-        }));
-        
-        setContacts(transformedContacts);
+        if (status === 'granted') {
+          const { data } = await Contacts.getContactsAsync({
+            fields: [
+              Contacts.Fields.Name,
+              Contacts.Fields.PhoneNumbers,
+            ],
+          });
+          deviceContacts = data || [];
+        }
+
+        // Merge device contacts with app users
+        const mergedContacts: Contact[] = [];
+        const processedPhones = new Set<string>();
+
+        // Process device contacts
+        deviceContacts.forEach(contact => {
+          if (contact.phoneNumbers && contact.phoneNumbers.length > 0) {
+            contact.phoneNumbers.forEach(phoneNumber => {
+              const phoneNum = phoneNumber.number || phoneNumber.digits || '';
+              if (!phoneNum) return;
+
+              const normalizedPhone = normalizePhone(phoneNum);
+              
+              // Skip duplicates
+              if (processedPhones.has(normalizedPhone)) return;
+              processedPhones.add(normalizedPhone);
+
+              const appUser = appUsersMap.get(normalizedPhone);
+              const contactName = contact.name || phoneNum;
+
+              if (appUser) {
+                // Contact is registered on the app
+                mergedContacts.push({
+                  id: appUser.id.toString(),
+                  name: appUser.name || contactName,
+                  phone: appUser.phone_number,
+                  isDeviceContact: true,
+                  isRegistered: true,
+                  isAdded: false,
+                  isOnline: false,
+                  lastSeen: undefined,
+                });
+              } else {
+                // Contact not on the app
+                mergedContacts.push({
+                  id: `device_${normalizedPhone}`,
+                  name: contactName,
+                  phone: phoneNum,
+                  isDeviceContact: true,
+                  isRegistered: false,
+                  isAdded: false,
+                  isOnline: false,
+                  lastSeen: undefined,
+                });
+              }
+            });
+          }
+        });
+
+        // Add app users that are not in device contacts
+        appUsers.forEach(user => {
+          const normalizedPhone = normalizePhone(user.phone_number);
+          if (!processedPhones.has(normalizedPhone)) {
+            mergedContacts.push({
+              id: user.id.toString(),
+              name: user.name || user.phone_number,
+              phone: user.phone_number,
+              isDeviceContact: false,
+              isRegistered: true,
+              isAdded: false,
+              isOnline: false,
+              lastSeen: undefined,
+            });
+          }
+        });
+
+        // Sort: registered contacts first, then by name
+        mergedContacts.sort((a, b) => {
+          if (a.isRegistered && !b.isRegistered) return -1;
+          if (!a.isRegistered && b.isRegistered) return 1;
+          return a.name.localeCompare(b.name);
+        });
+
+        setContacts(mergedContacts);
       } catch (err) {
         console.error('Failed to fetch contacts:', err);
         setError('Failed to load contacts');
-        // Fallback to sample data on error
-        setContacts([
-          { id: '1', name: 'Aaron Josh', phone: '+91 9983655423', isOnline: false },
-          { id: '2', name: 'Aaaron Hilton', phone: '+91 9122849573', isOnline: false },
-        ]);
       } finally {
         setLoading(false);
       }
     }
 
-    fetchContacts();
+    fetchAndMergeContacts();
   }, []);
 
-  // Request presence for all contacts when loaded
+  // Request presence for all registered contacts when loaded
   React.useEffect(() => {
     if (!socket || contacts.length === 0) return;
 
-    console.log('📡 Requesting presence for', contacts.length, 'contacts');
-    console.log('📡 Contact IDs:', contacts.map(c => c.id));
+    const registeredContacts = contacts.filter(c => c.isRegistered);
+    if (registeredContacts.length === 0) return;
+
+    console.log('📡 Requesting presence for', registeredContacts.length, 'registered contacts');
     
-    // Request presence for all contacts at once
-    const contactIds = contacts.map(contact => parseInt(contact.id));
+    // Request presence for registered contacts only
+    const contactIds = registeredContacts.map(contact => parseInt(contact.id));
     console.log('📡 Requesting presence for IDs:', contactIds);
     getPresenceInfo(contactIds);
   }, [socket, contacts.length]);
@@ -162,6 +254,9 @@ export default function AddContactsScreen() {
     
     // Format last seen like WhatsApp
     const formatLastSeen = () => {
+      if (!item.isRegistered) {
+        return 'Invite to Synapse';
+      }
       if (item.isOnline) return 'Online';
       if (!item.lastSeen) return item.phone; // Show phone number if no presence data
       
@@ -185,30 +280,48 @@ export default function AddContactsScreen() {
     
     return (
       <View style={styles.contactRow}>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => toggleSelect(item.id)}
-          style={[styles.checkbox, isSelected && styles.checkboxSelected]}
-        >
-          {isSelected ? (
-            <Ionicons name="checkmark" size={14} color="#fff" />
-          ) : (
-            <View />
-          )}
-        </TouchableOpacity>
+        {item.isRegistered && (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => toggleSelect(item.id)}
+            style={[styles.checkbox, isSelected && styles.checkboxSelected]}
+          >
+            {isSelected ? (
+              <Ionicons name="checkmark" size={14} color="#fff" />
+            ) : (
+              <View />
+            )}
+          </TouchableOpacity>
+        )}
 
         {/* avatar + name/phone */}
-        <View style={styles.contactInfo}>
+        <View style={[styles.contactInfo, !item.isRegistered && styles.contactInfoFullWidth]}>
           <View style={styles.nameRow}>
             <Text style={styles.contactName} numberOfLines={1}>
               {item.name}
             </Text>
             {item.isAdded && <Text style={styles.addedLabel}>Added</Text>}
+            {item.isDeviceContact && item.isRegistered && (
+              <Ionicons name="phone-portrait-outline" size={14} color="#6B7280" style={{ marginLeft: 6 }} />
+            )}
           </View>
-          <Text style={[styles.contactPhone, item.isOnline && styles.onlineText]}>
+          <Text 
+            style={[
+              styles.contactPhone, 
+              item.isOnline && styles.onlineText,
+              !item.isRegistered && styles.inviteText
+            ]}
+          >
             {formatLastSeen()}
           </Text>
         </View>
+
+        {/* Invite button for non-registered contacts */}
+        {!item.isRegistered && (
+          <Pressable style={styles.inviteButton}>
+            <Text style={styles.inviteButtonText}>Invite</Text>
+          </Pressable>
+        )}
       </View>
     );
   };
@@ -382,6 +495,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
+  contactInfoFullWidth: {
+    marginLeft: 13,
+  },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -409,6 +525,10 @@ const styles = StyleSheet.create({
   },
   onlineText: {
     color: '#25D366', // WhatsApp green for online status
+  },
+  inviteText: {
+    color: '#1A73E8', // Blue color for invite text
+    fontWeight: '500',
   },
   separator: {
     height: 1,
@@ -438,6 +558,18 @@ const styles = StyleSheet.create({
   addButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
+    fontFamily: 'SF Pro Text',
+    fontWeight: '600',
+  },
+  inviteButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    backgroundColor: '#EBEFF3',
+    borderRadius: 16,
+  },
+  inviteButtonText: {
+    color: '#1A1A1A',
+    fontSize: 14,
     fontFamily: 'SF Pro Text',
     fontWeight: '600',
   },

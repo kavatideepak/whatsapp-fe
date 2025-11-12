@@ -9,7 +9,10 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSContactsUsageDescription": "Synapse needs access to your contacts to help you connect with your teammates who are already using the app."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -20,7 +23,10 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-       "softwareKeyboardLayoutMode": "resize"
+      "softwareKeyboardLayoutMode": "resize",
+      "permissions": [
+        "READ_CONTACTS"
+      ]
     },
     "web": {
       "output": "static",
