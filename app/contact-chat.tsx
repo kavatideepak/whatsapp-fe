@@ -302,8 +302,13 @@ export default function ContactChatScreen() {
   };
 
 return (
-  <SafeAreaView style={{ flex: 1, backgroundColor: '#F7F7F7' }} edges={['top', 'bottom']}>
-    <ThemedView style={styles.container}>
+  <SafeAreaView style={{ flex: 1, backgroundColor: '#F7F7F7' }} edges={['top']}>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={0}
+    >
+      <ThemedView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
@@ -389,7 +394,7 @@ return (
             <TextInput
               style={styles.textInput}
               placeholder="Message..."
-              placeholderTextColor="#9A9A9A"
+              placeholderTextColor="#are9A9A9A"
               value={input}
               onChangeText={handleInputChange}
               multiline
@@ -404,7 +409,8 @@ return (
             <Ionicons name="send" size={20} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
-    </ThemedView>
+      </ThemedView>
+    </KeyboardAvoidingView>
   </SafeAreaView>
 );
 
