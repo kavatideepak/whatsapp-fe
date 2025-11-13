@@ -70,7 +70,7 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: colors.tabIconSelected,
+        tabBarActiveTintColor: isDark ? colors.tabIconSelected : colors.accent,
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarStyle: {
@@ -106,7 +106,7 @@ export default function TabLayout() {
           tabBarIcon: ({ focused }) => (
             <View style={[
               styles.iconWrapper,
-              isDark && focused && styles.activeBackground
+              isDark && focused && { backgroundColor: colors.accent, borderRadius: 20 }
             ]}>
               <Image 
                 source={require('../../assets/images/calls.png')}
@@ -124,7 +124,7 @@ export default function TabLayout() {
           tabBarIcon: ({ focused }) => (
             <View style={[
               styles.iconWrapper,
-              isDark && focused && styles.activeBackground
+              isDark && focused && { backgroundColor: colors.accent, borderRadius: 20 }
             ]}>
               <Image 
                 source={(!isDark && focused) 
@@ -146,7 +146,7 @@ export default function TabLayout() {
             <View style={styles.iconContainer}>
               <View style={[
                 styles.iconWrapper,
-                isDark && focused && styles.activeBackground
+                isDark && focused && { backgroundColor: colors.accent, borderRadius: 20 }
               ]}>
                 <Image 
                   source={(!isDark && focused) 
@@ -178,7 +178,7 @@ export default function TabLayout() {
           tabBarIcon: ({ focused }) => (
             <View style={[
               styles.iconWrapper,
-              isDark && focused && styles.activeBackground
+              isDark && focused && { backgroundColor: colors.accent, borderRadius: 20 }
             ]}>
               <Image 
                 source={require('../../assets/images/gear.png')}
@@ -208,10 +208,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 4,
-  },
-  activeBackground: {
-    backgroundColor: '#103527',
-    borderRadius: 20,
   },
   tabIcon: {
     width: 26,

@@ -1,26 +1,18 @@
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
 import { useAuth } from '../../context/AuthContext';
-import { useTheme } from '@/hooks/useTheme';
-
-const THEME_COLORS = [
-  { id: 1, color: '#1A1A1A', name: 'Default' },
-  { id: 2, color: '#B33A93', name: 'Purple' },
-  { id: 3, color: '#059866', name: 'Green' },
-  { id: 4, color: '#0080A3', name: 'Blue' },
-];
+import { useTheme, THEME_COLORS } from '@/hooks/useTheme';
 
 export default function SettingsScreen() {
   const { user, isLoading, isAuthenticated, logout } = useAuth();
   const router = useRouter();
-  const { colors } = useTheme();
+  const { colors, selectedThemeId, selectTheme } = useTheme();
   const insets = useSafeAreaInsets();
-  const [selectedTheme, setSelectedTheme] = useState(1); // Default theme selected
 
   const handleLogout = async () => {
     try {
@@ -130,12 +122,12 @@ export default function SettingsScreen() {
                     key={theme.id}
                     style={[
                       styles.themeColorOption,
-                      selectedTheme === theme.id && [styles.themeColorSelected, { borderColor: colors.accent }]
+                      selectedThemeId === theme.id && [styles.themeColorSelected, { borderColor: colors.accent }]
                     ]}
-                    onPress={() => setSelectedTheme(theme.id)}
+                    onPress={() => selectTheme(theme.id)}
                   >
                     <View style={[styles.themeColorCircle, { backgroundColor: theme.color }]}>
-                      {selectedTheme === theme.id && (
+                      {selectedThemeId === theme.id && (
                         <Ionicons name="checkmark" size={18} color="#FFFFFF" />
                       )}
                     </View>

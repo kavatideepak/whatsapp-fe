@@ -1,3 +1,4 @@
+
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
@@ -17,10 +18,10 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { updateUser } from '../services/api';
 import type { ApiError } from '../types/api';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../hooks/useTheme';
+import { useTheme, THEME_COLORS } from '../hooks/useTheme';
 
 export default function UploadPhotoScreen() {
-  const { colors } = useTheme();
+  const { colors, selectedThemeId, selectTheme } = useTheme();
   const params = useLocalSearchParams();
   const phoneNumber = (params.phoneNumber as string) || '';
   const { updateUser: updateAuthUser } = useAuth();
@@ -63,11 +64,11 @@ export default function UploadPhotoScreen() {
   };
 
   return (
-    <KeyboardAvoidingWrapper style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.content}>
+    <KeyboardAvoidingWrapper style={styles.container}>
+      <View style={[styles.content, { backgroundColor: colors.background }]}>
         {/* Avatar Section */}
         <View style={styles.avatarSection}>
-          <View style={[styles.avatarContainer, { borderColor: colors.text }]}>
+          <View style={[styles.avatarContainer, { borderColor: colors.accent }]}>
             <Image
               source={require('../assets/images/avatar.png')}
               style={styles.avatar}
@@ -95,22 +96,24 @@ export default function UploadPhotoScreen() {
         <View style={styles.themeSection}>
           <Text style={[styles.themeLabel, { color: colors.text }]}>Choose a color theme</Text>
           <View style={styles.colorContainer}>
-            <View style={[styles.colorOption, styles.selectedColorOption]}>
-              <View style={[styles.colorCircle, { backgroundColor: '#1A1A1A' }]}>
-                <View style={styles.checkmarkContainer}>
-                  <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+            {THEME_COLORS.map((theme) => (
+              <Pressable
+                key={theme.id}
+                style={[
+                  styles.colorOption,
+                  selectedThemeId === theme.id ? [styles.selectedColorOption, { borderColor: colors.accent }] : styles.unselectedColorOption
+                ]}
+                onPress={() => selectTheme(theme.id)}
+              >
+                <View style={[styles.colorCircle, { backgroundColor: theme.color }]}>
+                  {selectedThemeId === theme.id && (
+                    <View style={styles.checkmarkContainer}>
+                      <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+                    </View>
+                  )}
                 </View>
-              </View>
-            </View>
-            <View style={[styles.colorOption, styles.unselectedColorOption]}>
-              <View style={[styles.colorCircle, { backgroundColor: '#B33A93' }]} />
-            </View>
-            <View style={[styles.colorOption, styles.unselectedColorOption]}>
-              <View style={[styles.colorCircle, { backgroundColor: '#059866' }]} />
-            </View>
-            <View style={[styles.colorOption, styles.unselectedColorOption]}>
-              <View style={[styles.colorCircle, { backgroundColor: '#0080A3' }]} />
-            </View>
+              </Pressable>
+            ))}
           </View>
         </View>
 
