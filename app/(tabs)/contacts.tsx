@@ -103,20 +103,25 @@ export default function ContactsScreen() {
     }
   }
 
-  // Filter contacts based on search query
+  // Filter contacts based on search query and exclude self user
   const filteredContacts = React.useMemo(() => {
+    // First, exclude the logged-in user from the list
+    const contactsWithoutSelf = contacts.filter(
+      contact => contact.id !== currentUser?.id
+    );
+    
     if (!searchQuery.trim()) {
-      return contacts;
+      return contactsWithoutSelf;
     }
     
     const query = searchQuery.toLowerCase();
-    return contacts.filter(contact =>
+    return contactsWithoutSelf.filter(contact =>
       contact.name.toLowerCase().includes(query) ||
       contact.phone_number.toLowerCase().includes(query) ||
       contact.email?.toLowerCase().includes(query) ||
       contact.department?.toLowerCase().includes(query)
     );
-  }, [contacts, searchQuery]);
+  }, [contacts, searchQuery, currentUser?.id]);
 
   const renderItem = ({ item }: { item: Contact }) => {
     const isLoading = initiatingChat === item.id;

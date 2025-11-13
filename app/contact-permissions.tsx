@@ -43,7 +43,7 @@ export default function ContactPermissionsScreen() {
       if (currentStatus === 'granted') {
         // Already granted, proceed to sync contacts
         await AsyncStorage.setItem(CONTACTS_PERMISSION_KEY, 'granted');
-        router.push('/add-contacts');
+        router.push('/add-contacts?from=onboarding');
         return;
       }
       
@@ -53,7 +53,7 @@ export default function ContactPermissionsScreen() {
       if (status === 'granted') {
         // Permission granted
         await AsyncStorage.setItem(CONTACTS_PERMISSION_KEY, 'granted');
-        router.push('/add-contacts');
+        router.push('/add-contacts?from=onboarding');
       } else if (status === 'denied') {
         // Permission denied
         await AsyncStorage.setItem(CONTACTS_PERMISSION_KEY, 'denied');

@@ -1,6 +1,6 @@
 // add-contacts.tsx
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import React from 'react';
 import {
     ActivityIndicator,
@@ -8,6 +8,7 @@ import {
     Dimensions,
     FlatList,
     Pressable,
+    SectionList,
     StyleSheet,
     Text,
     TextInput,
@@ -16,7 +17,8 @@ import {
 } from 'react-native';
 import * as Contacts from 'expo-contacts';
 import { ThemedView } from '../components/themed-view';
-import { matchContacts, addCorporateContacts } from '../services/api';
+import { matchContacts, addCorporateContacts, getCorporateContacts } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 type CorporateContact = {
   id: number;
@@ -27,13 +29,25 @@ type CorporateContact = {
   job_title?: string;
   profile_pic?: string;
   matched: boolean;
+  is_on_synapse: boolean;
+  synapse_user_id?: number | null;
+};
+
+type ContactSection = {
+  title: string;
+  data: CorporateContact[];
 };
 
 export default function AddContactsScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const { user: currentUser } = useAuth(); // Get logged-in user
+  const isOnboarding = params.from === 'onboarding'; // Check if coming from onboarding
+  
   const [query, setQuery] = React.useState('');
   const [selected, setSelected] = React.useState<Record<number, boolean>>({});
-  const [contacts, setContacts] = React.useState<CorporateContact[]>([]);
+  const [matchedContacts, setMatchedContacts] = React.useState<CorporateContact[]>([]);
+  const [officeContacts, setOfficeContacts] = React.useState<CorporateContact[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [adding, setAdding] = React.useState(false);
@@ -67,14 +81,44 @@ export default function AddContactsScreen() {
           });
         }
 
-        // Match device phone numbers with corporate contacts
-        const response = await matchContacts(devicePhoneNumbers);
-        const matchedContacts = response.data.matches.map((contact: any) => ({
-          ...contact,
-          matched: true
-        }));
+        // Fetch all corporate contacts and match with device contacts
+        // Only call matchContacts if we have phone numbers to match
+        const corporateResponse = await getCorporateContacts();
+        let matchedContactsData = [];
 
-        setContacts(matchedContacts);
+        if (devicePhoneNumbers.length > 0) {
+          const matchResponse = await matchContacts(devicePhoneNumbers);
+          matchedContactsData = matchResponse.data?.matches || matchResponse.data || [];
+        }
+
+        const allCorporateContacts = corporateResponse.data?.contacts || corporateResponse.data || [];
+
+        // Create a Set of matched contact IDs for quick lookup
+        const matchedIds = new Set(matchedContactsData.map((c: any) => c.id));
+
+        // Segregate contacts
+        const matched: CorporateContact[] = [];
+        const office: CorporateContact[] = [];
+
+        if (Array.isArray(allCorporateContacts)) {
+          allCorporateContacts.forEach((contact: any) => {
+            const contactData = {
+              ...contact,
+              matched: matchedIds.has(contact.id),
+              is_on_synapse: contact.is_on_synapse || false,
+              synapse_user_id: contact.synapse_user_id || null
+            };
+
+            if (matchedIds.has(contact.id)) {
+              matched.push(contactData);
+            } else {
+              office.push(contactData);
+            }
+          });
+        }
+
+        setMatchedContacts(matched);
+        setOfficeContacts(office);
       } catch (err: any) {
         console.error('Failed to fetch and match contacts:', err);
         setError(err.message || 'Failed to load contacts');
@@ -86,19 +130,56 @@ export default function AddContactsScreen() {
     fetchAndMatchContacts();
   }, []);
 
-  // Derived filtered list
-  const filtered = React.useMemo(() => {
-    if (!query.trim()) return contacts;
-    const q = query.toLowerCase();
-    return contacts.filter(
-      (c) => c.name.toLowerCase().includes(q) || 
-             c.phone_number.toLowerCase().includes(q) ||
-             c.email?.toLowerCase().includes(q) ||
-             c.department?.toLowerCase().includes(q)
-    );
-  }, [query, contacts]);
+  // Derived filtered list with sections
+  const sections = React.useMemo((): ContactSection[] => {
+    const filterContact = (c: CorporateContact, q: string) => 
+      c.name.toLowerCase().includes(q) || 
+      c.phone_number.toLowerCase().includes(q) ||
+      c.email?.toLowerCase().includes(q) ||
+      c.department?.toLowerCase().includes(q);
 
-  function toggleSelect(id: number) {
+    const q = query.toLowerCase().trim();
+    const filteredMatched = q ? matchedContacts.filter(c => filterContact(c, q)) : matchedContacts;
+    const filteredOffice = q ? officeContacts.filter(c => filterContact(c, q)) : officeContacts;
+
+    const result: ContactSection[] = [];
+    
+    if (filteredMatched.length > 0) {
+      result.push({
+        title: 'In your contacts',
+        data: filteredMatched
+      });
+    }
+    
+    if (filteredOffice.length > 0) {
+      result.push({
+        title: 'In your office',
+        data: filteredOffice
+      });
+    }
+
+    return result;
+  }, [query, matchedContacts, officeContacts]);
+
+  // Count how many contacts are on Synapse
+  const synapseCount = React.useMemo(() => {
+    const allContacts = [...matchedContacts, ...officeContacts];
+    return allContacts.filter(c => c.is_on_synapse).length;
+  }, [matchedContacts, officeContacts]);
+
+  const totalCount = matchedContacts.length + officeContacts.length;
+
+  function toggleSelect(id: number, isOnSynapse: boolean) {
+    // Only allow selection if contact is on Synapse
+    if (!isOnSynapse) {
+      Alert.alert(
+        'Not on Synapse',
+        'This contact hasn\'t registered on Synapse yet. Only registered users can be added.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
     setSelected((s) => {
       const next = { ...s };
       if (next[id]) delete next[id];
@@ -123,21 +204,47 @@ export default function AddContactsScreen() {
 
       setAdding(false);
 
-      const { added, existing } = response.data;
+      const { added, existing, failed } = response.data;
 
-      Alert.alert(
-        'Success',
-        `✓ ${added.length} contact(s) added${existing.length > 0 ? `\n${existing.length} already in your list` : ''}`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              // Navigate to contacts tab
-              router.push('/(tabs)/contacts');
+      // Show appropriate message based on results
+      if (failed && failed.length > 0) {
+        const notOnSynapseCount = failed.filter((f: any) => 
+          f.error === 'This contact is not on Synapse yet'
+        ).length;
+        
+        if (notOnSynapseCount > 0) {
+          Alert.alert(
+            'Some Contacts Not Added',
+            `✓ ${added.length} contact(s) added successfully\n\n${notOnSynapseCount} contact(s) couldn't be added because they're not on Synapse yet.`,
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  if (added.length > 0) {
+                    router.push('/(tabs)/contacts');
+                  }
+                }
+              }
+            ]
+          );
+        } else {
+          Alert.alert('Error', 'Some contacts could not be added. Please try again.');
+        }
+      } else {
+        Alert.alert(
+          'Success',
+          `✓ ${added.length} contact(s) added${existing.length > 0 ? `\n${existing.length} already in your list` : ''}`,
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                // Navigate to contacts tab
+                router.push('/(tabs)/contacts');
+              }
             }
-          }
-        ]
-      );
+          ]
+        );
+      }
 
       // Clear selection
       setSelected({});
@@ -151,13 +258,20 @@ export default function AddContactsScreen() {
 
   const renderItem = ({ item }: { item: CorporateContact }) => {
     const isSelected = !!selected[item.id];
+    const isOnSynapse = item.is_on_synapse;
+    const isSelf = item.synapse_user_id === currentUser?.id; // Check if this is the logged-in user
     
     return (
-      <View style={styles.contactRow}>
+      <View style={[styles.contactRow, !isOnSynapse && styles.contactRowDisabled]}>
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={() => toggleSelect(item.id)}
-          style={[styles.checkbox, isSelected && styles.checkboxSelected]}
+          onPress={() => toggleSelect(item.id, isOnSynapse)}
+          style={[
+            styles.checkbox, 
+            isSelected && styles.checkboxSelected,
+            !isOnSynapse && styles.checkboxDisabled
+          ]}
+          disabled={!isOnSynapse}
         >
           {isSelected ? (
             <Ionicons name="checkmark" size={14} color="#fff" />
@@ -168,16 +282,27 @@ export default function AddContactsScreen() {
 
         <View style={styles.contactInfo}>
           <View style={styles.nameRow}>
-            <Text style={styles.contactName} numberOfLines={1}>
+            <Text style={[styles.contactName, !isOnSynapse && styles.textDisabled]} numberOfLines={1}>
               {item.name}
             </Text>
-            <Ionicons name="briefcase-outline" size={14} color="#6B7280" style={{ marginLeft: 6 }} />
+            {isSelf && (
+              <Text style={styles.youBadge}> (You)</Text>
+            )}
+            {isOnSynapse ? (
+              <View style={styles.synapseBadge}>
+                <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+              </View>
+            ) : (
+              <View style={styles.notOnSynapseBadge}>
+                <Text style={styles.notOnSynapseText}>Not on Synapse</Text>
+              </View>
+            )}
           </View>
-          <Text style={styles.contactDetail} numberOfLines={1}>
+          <Text style={[styles.contactDetail, !isOnSynapse && styles.textDisabled]} numberOfLines={1}>
             {item.job_title || ''}{item.job_title && item.department ? ' • ' : ''}{item.department || ''}
           </Text>
           {item.email && (
-            <Text style={styles.contactEmail} numberOfLines={1}>
+            <Text style={[styles.contactEmail, !isOnSynapse && styles.textDisabled]} numberOfLines={1}>
               {item.email}
             </Text>
           )}
@@ -192,10 +317,23 @@ export default function AddContactsScreen() {
           <Text style={styles.topText}>
             These are your teammates from the company directory who are in your phone contacts.
           </Text>
-          <Pressable onPress={() => router.back()} style={styles.closeButton}>
+          <Pressable 
+            onPress={() => isOnboarding ? router.push('/setup-success') : router.back()} 
+            style={styles.closeButton}
+          >
             <Ionicons name="close" size={20} color="#1A1A1A" />
           </Pressable>
         </View>
+
+        {/* Synapse status banner */}
+        {!loading && totalCount > 0 && (
+          <View style={styles.statusBanner}>
+            <Ionicons name="people" size={16} color="#10B981" />
+            <Text style={styles.statusText}>
+              {synapseCount} of {totalCount} contacts on Synapse
+            </Text>
+          </View>
+        )}
 
         <View style={styles.content}>
           <View style={styles.searchContainer}>
@@ -218,7 +356,7 @@ export default function AddContactsScreen() {
             <View style={styles.centerContent}>
               <Text style={styles.errorText}>{error}</Text>
             </View>
-          ) : filtered.length === 0 ? (
+          ) : sections.length === 0 ? (
             <View style={styles.centerContent}>
               <Ionicons name="people-outline" size={64} color="#D0D0D0" />
               <Text style={styles.emptyText}>No matching contacts found</Text>
@@ -227,19 +365,25 @@ export default function AddContactsScreen() {
               </Text>
             </View>
           ) : (
-            <FlatList
-              data={filtered}
-              keyExtractor={(i) => i.id.toString()}
-              renderItem={renderItem}
+            <SectionList
+              sections={sections}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={({ item }) => renderItem({ item })}
+              renderSectionHeader={({ section: { title } }) => (
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>{title}</Text>
+                </View>
+              )}
               ItemSeparatorComponent={() => <View style={styles.separator} />}
               contentContainerStyle={styles.listContent}
               showsVerticalScrollIndicator={false}
+              stickySectionHeadersEnabled={false}
             />
           )}
         </View>
 
-        {selectedCount > 0 && (
-          <View style={styles.footer}>
+        <View style={styles.footer}>
+          {selectedCount > 0 ? (
             <Pressable
               style={[styles.addButton, adding && styles.buttonDisabled]}
               onPress={handleAddContacts}
@@ -249,8 +393,15 @@ export default function AddContactsScreen() {
                 {adding ? 'Adding...' : `Add ${selectedCount} contact${selectedCount > 1 ? 's' : ''}`}
               </Text>
             </Pressable>
-          </View>
-        )}
+          ) : isOnboarding ? (
+            <Pressable
+              style={styles.skipButton}
+              onPress={() => router.push('/setup-success')}
+            >
+              <Text style={styles.skipButtonText}>Skip for now</Text>
+            </Pressable>
+          ) : null}
+        </View>
     </ThemedView>
   );
 }
@@ -283,6 +434,23 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     padding: 8,
     borderRadius: 12,
+  },
+  statusBanner: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#ECFDF5',
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#059669',
+    fontFamily: 'SF Pro Text',
   },
   content: {
     flex: 1,
@@ -335,12 +503,29 @@ const styles = StyleSheet.create({
   listContent: {
     paddingBottom: 10,
   },
+  sectionHeader: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#767779',
+    fontFamily: 'SF Pro Text',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   contactRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
     gap: 13,
+  },
+  contactRowDisabled: {
+    opacity: 0.5,
   },
   checkbox: {
     width: 20,
@@ -354,6 +539,10 @@ const styles = StyleSheet.create({
   checkboxSelected: {
     backgroundColor: '#1A1A1A',
     borderColor: '#1A1A1A',
+  },
+  checkboxDisabled: {
+    borderColor: '#D0D0D0',
+    backgroundColor: '#F5F5F5',
   },
   contactInfo: {
     flex: 1,
@@ -370,6 +559,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     maxWidth: window.width - 170,
   },
+  youBadge: {
+    fontSize: 15,
+    fontFamily: 'SF Pro Text',
+    color: '#767779',
+    fontWeight: '500',
+    marginLeft: 4,
+  },
   contactDetail: {
     marginTop: 2,
     fontSize: 14,
@@ -380,6 +576,27 @@ const styles = StyleSheet.create({
     marginTop: 1,
     fontSize: 13,
     color: '#999',
+    fontFamily: 'SF Pro Text',
+  },
+  textDisabled: {
+    color: '#B2B2B2',
+  },
+  synapseBadge: {
+    marginLeft: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  notOnSynapseBadge: {
+    marginLeft: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    backgroundColor: '#FEF3C7',
+    borderRadius: 8,
+  },
+  notOnSynapseText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#92400E',
     fontFamily: 'SF Pro Text',
   },
   separator: {
@@ -410,6 +627,21 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     color: '#FFFFFF',
+    fontSize: 16,
+    fontFamily: 'SF Pro Text',
+    fontWeight: '600',
+  },
+  skipButton: {
+    width: '100%',
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#EBEFF3',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  skipButtonText: {
+    color: '#1A1A1A',
     fontSize: 16,
     fontFamily: 'SF Pro Text',
     fontWeight: '600',

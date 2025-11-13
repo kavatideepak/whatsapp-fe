@@ -16,6 +16,7 @@
       }
     },
     "android": {
+      "package": "com.synapse.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -47,11 +48,18 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f77e7e0a-5a0a-4008-84d2-61917da92daf"
+      }
     }
   }
 }

@@ -316,6 +316,16 @@ export async function matchContacts(phoneNumbers: string[]): Promise<any> {
     } as ApiError;
   }
 
+  // Validate that phoneNumbers is a non-empty array
+  if (!Array.isArray(phoneNumbers) || phoneNumbers.length === 0) {
+    // Return empty matches instead of making API call
+    return {
+      data: {
+        matches: []
+      }
+    };
+  }
+
   return fetchApi<any>('/contacts/match', {
     method: 'POST',
     body: JSON.stringify({ phone_numbers: phoneNumbers }),

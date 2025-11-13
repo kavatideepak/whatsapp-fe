@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,12 +10,14 @@ import {
   Text,
   TextInput,
   TextInputKeyPressEventData,
-  View
+  View,
+  Clipboard,
+  Keyboard
 } from 'react-native';
 import KeyboardAvoidingWrapper from '../components/keyboard-avoiding-wrapper';
 import { Colors } from '../constants/theme';
 import { useAuth } from '../context/AuthContext';
-import { verifyOtp } from '../services/api';
+import { verifyOtp, requestOtp } from '../services/api';
 import type { ApiError } from '../types/api';
 
 export default function VerifyOtpScreen() {
@@ -25,12 +27,131 @@ export default function VerifyOtpScreen() {
   
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [isLoading, setIsLoading] = useState(false);
+  const [autoDetected, setAutoDetected] = useState(false);
+  const [resendTimer, setResendTimer] = useState(120); // 60 seconds countdown
+  const [canResend, setCanResend] = useState(false);
+  const [isResending, setIsResending] = useState(false);
   
   // Create refs for each TextInput with proper typing
   const inputRefs = useRef<Array<TextInput | null>>([]);
+  const clipboardCheckInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Auto-detect OTP from clipboard
+  useEffect(() => {
+    let isMounted = true;
+    let checkCount = 0;
+    const maxChecks = 30; // Check for 60 seconds (30 checks * 2 seconds)
+
+    const checkClipboard = async () => {
+      if (!isMounted || autoDetected || checkCount >= maxChecks) {
+        if (clipboardCheckInterval.current) {
+          clearInterval(clipboardCheckInterval.current);
+        }
+        return;
+      }
+
+      try {
+        const clipboardContent = await Clipboard.getString();
+        
+        // Check if clipboard contains a 6-digit OTP
+        // Match patterns like: "123456", "Your OTP: 123456", "Code: 123456", etc.
+        const otpMatch = clipboardContent.match(/\b(\d{6})\b/);
+        
+        if (otpMatch && isMounted && !autoDetected) {
+          const detectedOtp = otpMatch[1].split('');
+          setOtp(detectedOtp);
+          setAutoDetected(true);
+          
+          console.log('OTP auto-detected and filled');
+          
+          // Close keyboard when OTP is auto-filled
+          Keyboard.dismiss();
+          
+          // Stop checking once detected
+          if (clipboardCheckInterval.current) {
+            clearInterval(clipboardCheckInterval.current);
+          }
+        }
+        
+        checkCount++;
+      } catch (error) {
+        console.log('Clipboard check error:', error);
+      }
+    };
+
+    // Check clipboard immediately on mount
+    checkClipboard();
+
+    // Continue checking every 2 seconds
+    clipboardCheckInterval.current = setInterval(checkClipboard, 2000);
+
+    return () => {
+      isMounted = false;
+      if (clipboardCheckInterval.current) {
+        clearInterval(clipboardCheckInterval.current);
+      }
+    };
+  }, [autoDetected]);
+
+  // Resend timer countdown
+  useEffect(() => {
+    if (resendTimer > 0 && !canResend) {
+      timerInterval.current = setInterval(() => {
+        setResendTimer((prev) => {
+          if (prev <= 1) {
+            setCanResend(true);
+            if (timerInterval.current) {
+              clearInterval(timerInterval.current);
+            }
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (timerInterval.current) {
+        clearInterval(timerInterval.current);
+      }
+    };
+  }, [resendTimer, canResend]);
 
   const handleWrongNumber = () => {
     router.back();
+  };
+
+  const handleResendOtp = async () => {
+    if (!canResend || isResending) return;
+
+    if (!phoneNumber) {
+      Alert.alert('Error', 'Phone number is missing. Please go back and try again.');
+      return;
+    }
+
+    setIsResending(true);
+    try {
+      await requestOtp(phoneNumber);
+      
+      // Reset timer and states
+      setResendTimer(120);
+      setCanResend(false);
+      setAutoDetected(false);
+      setOtp(['', '', '', '', '', '']);
+      
+      Alert.alert('Success', 'OTP has been resent to your phone number');
+      inputRefs.current[0]?.focus();
+    } catch (error) {
+      const apiError = error as ApiError;
+      Alert.alert(
+        'Error',
+        apiError.message || 'Failed to resend OTP. Please try again.'
+      );
+      console.error('Failed to resend OTP:', error);
+    } finally {
+      setIsResending(false);
+    }
   };
 
   const handleChangeOtp = (value: string, index: number) => {
@@ -44,6 +165,9 @@ export default function VerifyOtpScreen() {
     // Move to next input if a digit is entered
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
+    } else if (value && index === 5) {
+      // Close keyboard when last digit is entered
+      Keyboard.dismiss();
     }
   };
 
@@ -93,14 +217,23 @@ export default function VerifyOtpScreen() {
       console.log('Stored auth data:', {
         token: response.token,
         userId: response.user.id,
-        phoneNumber: response.user.phone_number
+        phoneNumber: response.user.phone_number,
+        hasName: !!response.user.name
       });
       
-      // Navigate to next screen (upload photo) and pass phone number
-      router.push({
-        pathname: '/upload-photo',
-        params: { phoneNumber }
-      });
+      // Check if user already has a name (returning user) or is new
+      if (response.user.name) {
+        // Returning user - skip profile setup and go to setup success
+        console.log('Returning user detected, skipping profile setup');
+        router.replace('/setup-success');
+      } else {
+        // New user - navigate to profile setup (upload photo/name)
+        console.log('New user detected, navigating to profile setup');
+        router.push({
+          pathname: '/upload-photo',
+          params: { phoneNumber }
+        });
+      }
     } catch (error) {
       const apiError = error as ApiError;
       Alert.alert(
@@ -162,9 +295,15 @@ export default function VerifyOtpScreen() {
         </View>
 
            <View style={styles.resendCodeSection}>
-            <Text style={styles.link} onPress={handleWrongNumber}>
-              Didn’t receive code? Resend code
-            </Text>
+            {canResend ? (
+              <Text style={styles.link} onPress={handleResendOtp}>
+                {isResending ? 'Sending...' : "Didn't receive code? Resend code"}
+              </Text>
+            ) : (
+              <Text style={styles.timerText}>
+                Resend code in {resendTimer}s
+              </Text>
+            )}
         </View>
       </View>
 
@@ -241,6 +380,15 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     letterSpacing: -0.22,
     color: '#016EEB',
+  },
+  timerText: {
+    fontFamily: 'SF Pro Text',
+    fontWeight: '400',
+    fontSize: 13,
+    lineHeight: 20,
+    letterSpacing: -0.22,
+    color: '#666',
+    textAlign: 'center',
   },
   otpContainer: {
     marginTop: 34,

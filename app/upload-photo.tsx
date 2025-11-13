@@ -16,10 +16,12 @@ import { Colors } from '../constants/theme';
 import { router, useLocalSearchParams } from 'expo-router';
 import { updateUser } from '../services/api';
 import type { ApiError } from '../types/api';
+import { useAuth } from '../context/AuthContext';
 
 export default function UploadPhotoScreen() {
   const params = useLocalSearchParams();
   const phoneNumber = (params.phoneNumber as string) || '';
+  const { updateUser: updateAuthUser } = useAuth();
   
   const [name, setName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -40,6 +42,9 @@ export default function UploadPhotoScreen() {
     try {
       const response = await updateUser(phoneNumber, { name: name.trim() });
       console.log('User profile updated successfully:', response);
+      
+      // Update the user in the auth context with the new data
+      await updateAuthUser(response.user);
       
       // Navigate to contact permissions screen
       router.push('/contact-permissions');

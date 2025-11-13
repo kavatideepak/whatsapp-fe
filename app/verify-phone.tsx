@@ -1,15 +1,43 @@
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, TextInput, View, Alert, ActivityIndicator } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, TextInput, View, Alert, ActivityIndicator, Keyboard, Modal, FlatList, TouchableOpacity } from 'react-native';
 import KeyboardAvoidingWrapper from '../components/keyboard-avoiding-wrapper';
 import { IconSymbol } from '../components/ui/icon-symbol';
 import { Colors } from '../constants/theme';
 import { requestOtp } from '../services/api';
 import type { ApiError } from '../types/api';
 
+interface Country {
+  id: string;
+  name: string;
+  code: string;
+}
+
+const COUNTRIES: Country[] = [
+  { id: 'IN', name: 'India', code: '+91' },
+  { id: 'US', name: 'United States', code: '+1' },
+  { id: 'GB', name: 'United Kingdom', code: '+44' },
+  { id: 'CA', name: 'Canada', code: '+1' },
+  { id: 'AU', name: 'Australia', code: '+61' },
+  { id: 'DE', name: 'Germany', code: '+49' },
+  { id: 'FR', name: 'France', code: '+33' },
+  { id: 'JP', name: 'Japan', code: '+81' },
+  { id: 'CN', name: 'China', code: '+86' },
+  { id: 'SG', name: 'Singapore', code: '+65' },
+  { id: 'AE', name: 'United Arab Emirates', code: '+971' },
+  { id: 'SA', name: 'Saudi Arabia', code: '+966' },
+  { id: 'ZA', name: 'South Africa', code: '+27' },
+  { id: 'BR', name: 'Brazil', code: '+55' },
+  { id: 'MX', name: 'Mexico', code: '+52' },
+  { id: 'ES', name: 'Spain', code: '+34' },
+  { id: 'IT', name: 'Italy', code: '+39' },
+  { id: 'RU', name: 'Russia', code: '+7' },
+  { id: 'KR', name: 'South Korea', code: '+82' },
+  { id: 'NL', name: 'Netherlands', code: '+31' },
+];
+
 export default function VerifyPhoneScreen() {
-  const [selectedCountry, setSelectedCountry] = useState('India');
-  const [countryCode, setCountryCode] = useState('+91');
+  const [selectedCountry, setSelectedCountry] = useState<Country>(COUNTRIES[0]); // India as default
   const [phoneNumber, setPhoneNumber] = useState('');
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -19,8 +47,9 @@ export default function VerifyPhoneScreen() {
     console.log('What\'s my number clicked');
   };
 
-  const handleCountrySelect = () => {
-    setShowCountryPicker(!showCountryPicker);
+  const handleCountrySelect = (country: Country) => {
+    setSelectedCountry(country);
+    setShowCountryPicker(false);
   };
 
   const handleNext = async () => {
@@ -30,7 +59,7 @@ export default function VerifyPhoneScreen() {
       return;
     }
 
-    const fullPhoneNumber = `${countryCode}${phoneNumber}`;
+    const fullPhoneNumber = `${selectedCountry.code}${phoneNumber}`;
     
     setIsLoading(true);
     try {
@@ -70,8 +99,10 @@ export default function VerifyPhoneScreen() {
         </View>
 
         {/* Country Selector */}
-        <Pressable style={styles.countrySelector} onPress={handleCountrySelect}>
-          <Text style={styles.countrySelectorText}>{selectedCountry}</Text>
+        <Pressable style={styles.countrySelector} onPress={() => setShowCountryPicker(true)}>
+          <View style={styles.countryDisplay}>
+            <Text style={styles.countrySelectorText}>{selectedCountry.name}</Text>
+          </View>
           <IconSymbol
             name="chevron.down"
             size={24}
@@ -84,7 +115,7 @@ export default function VerifyPhoneScreen() {
         <View style={styles.phoneInputContainer}>
           {/* Country Code */}
           <View style={styles.countryCodeContainer}>
-            <Text style={styles.countryCodeText}>{countryCode}</Text>
+            <Text style={styles.countryCodeText}>{selectedCountry.code}</Text>
           </View>
 
           {/* Phone Number Input */}
@@ -93,8 +124,15 @@ export default function VerifyPhoneScreen() {
             placeholder="Phone number"
             keyboardType="phone-pad"
             value={phoneNumber}
-            onChangeText={setPhoneNumber}
+            onChangeText={(text) => {
+              setPhoneNumber(text);
+              // Automatically close keyboard when 10 digits are entered
+              if (text.length === 10) {
+                Keyboard.dismiss();
+              }
+            }}
             placeholderTextColor="#999"
+            maxLength={10}
           />
         </View>
       </View>
@@ -113,6 +151,38 @@ export default function VerifyPhoneScreen() {
           )}
         </Pressable>
       </View>
+
+      {/* Country Picker Modal */}
+      <Modal
+        visible={showCountryPicker}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowCountryPicker(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Country</Text>
+              <TouchableOpacity onPress={() => setShowCountryPicker(false)}>
+                <IconSymbol name="xmark" size={24} color="#1A1A1A" />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={COUNTRIES}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.countryItem}
+                  onPress={() => handleCountrySelect(item)}
+                >
+                  <Text style={styles.countryName}>{item.name}</Text>
+                  <Text style={styles.countryCodeInList}>{item.code}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingWrapper>
   );
 }
@@ -166,16 +236,19 @@ const styles = StyleSheet.create<{[key: string]: any}>({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
   },
+  countryDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
   countrySelectorText: {
     fontFamily: 'SF Pro Text',
     fontWeight: '400',
     fontSize: 17,
-    lineHeight: 17, // 100% of fontSize
-    letterSpacing: -0.34, // -2% of fontSize
+    lineHeight: 17,
+    letterSpacing: -0.34,
     color: '#1A1A1A',
-    textAlign: 'center',  // Center the text inside the space
-    flex: 1,  // Make the text container flexible to take up space and center the text
-    
   },
   dropdownIcon: {
     width: 24,
@@ -238,5 +311,51 @@ const styles = StyleSheet.create<{[key: string]: any}>({
     fontSize: 16,
     fontWeight: '600',
     fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'SF Pro Text',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+    paddingBottom: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E5',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    fontFamily: 'SF Pro Text',
+  },
+  countryItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 0.5,
+    borderBottomColor: '#E5E5E5',
+  },
+  countryName: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1A1A1A',
+    fontFamily: 'SF Pro Text',
+  },
+  countryCodeInList: {
+    fontSize: 16,
+    color: '#666',
+    fontFamily: 'SF Pro Text',
   },
 });
