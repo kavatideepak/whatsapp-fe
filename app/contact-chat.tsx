@@ -1,5 +1,4 @@
 // app/contact-chat.tsx
-import KeyboardAvoidingWrapper from '@/components/keyboard-avoiding-wrapper';
 import { useAuth } from '@/context/AuthContext';
 import { useChat } from '@/hooks/useChat';
 import { useSocket } from '@/hooks/useSocket';
@@ -12,6 +11,9 @@ import {
   Dimensions,
   FlatList,
   ImageBackground,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -300,9 +302,8 @@ export default function ContactChatScreen() {
   };
 
 return (
-  <ThemedView style={styles.container}>
-    <KeyboardAvoidingWrapper dismissKeyboardOnTap={false}>
-      <SafeAreaView style={{ flex: 1 }}>
+  <SafeAreaView style={{ flex: 1, backgroundColor: '#F7F7F7' }} edges={['top', 'bottom']}>
+    <ThemedView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
@@ -403,9 +404,8 @@ return (
             <Ionicons name="send" size={20} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
-    </KeyboardAvoidingWrapper>
-  </ThemedView>
+    </ThemedView>
+  </SafeAreaView>
 );
 
 }
@@ -415,7 +415,7 @@ const window = Dimensions.get('window');
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    // backgroundColor: '#F7F7F7',
+    backgroundColor: '#F7F7F7',
   },
   chatBackground: {
     flex: 1,
@@ -553,11 +553,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    zIndex: 20,
-    elevation: 20,
     backgroundColor: '#F7F7F7',
-    paddingBottom: 10,
+    paddingBottom: Platform.OS === 'ios' ? 8 : 12,
     paddingTop: 8,
+    borderTopWidth: 0.5,
+    borderTopColor: '#E5E5E5',
   },
   inputBox: {
     flex: 1,
