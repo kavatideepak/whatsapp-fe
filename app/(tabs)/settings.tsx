@@ -4,10 +4,12 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '@/hooks/useTheme';
 
 export default function SettingsScreen() {
   const { user, token, isLoading, isAuthenticated, logout } = useAuth();
   const router = useRouter();
+  const { colors } = useTheme();
 
   const handleLogout = async () => {
     try {
@@ -21,36 +23,36 @@ export default function SettingsScreen() {
 
   if (isLoading) {
     return (
-      <ThemedView style={styles.container}>
-        <ActivityIndicator size="large" color="#1A1A1A" />
+      <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.accent} />
       </ThemedView>
     );
   }
 
   return (
-    <ThemedView style={styles.container}>
-      <ThemedText style={styles.title}>Settings</ThemedText>
+    <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
+      <ThemedText style={[styles.title, { color: colors.text }]}>Settings</ThemedText>
       
       {isAuthenticated && user ? (
         <View style={styles.infoSection}>
-          <Text style={styles.label}>User Information:</Text>
-          <Text style={styles.info}>User ID: {user.id}</Text>
-          <Text style={styles.info}>Phone: {user.phone_number}</Text>
-          <Text style={styles.info}>Name: {user.name || 'Not set'}</Text>
-          <Text style={styles.info}>Email: {user.email || 'Not set'}</Text>
-          <Text style={styles.info}>About: {user.about || 'Not set'}</Text>
+          <Text style={[styles.label, { color: colors.text }]}>User Information:</Text>
+          <Text style={[styles.info, { color: colors.textSecondary }]}>User ID: {user.id}</Text>
+          <Text style={[styles.info, { color: colors.textSecondary }]}>Phone: {user.phone_number}</Text>
+          <Text style={[styles.info, { color: colors.textSecondary }]}>Name: {user.name || 'Not set'}</Text>
+          <Text style={[styles.info, { color: colors.textSecondary }]}>Email: {user.email || 'Not set'}</Text>
+          <Text style={[styles.info, { color: colors.textSecondary }]}>About: {user.about || 'Not set'}</Text>
           
-          <Text style={[styles.label, { marginTop: 20 }]}>Token:</Text>
-          <Text style={styles.tokenText} numberOfLines={2}>
+          <Text style={[styles.label, { color: colors.text, marginTop: 20 }]}>Token:</Text>
+          <Text style={[styles.tokenText, { color: colors.textTertiary }]} numberOfLines={2}>
             {token ? `${token.substring(0, 50)}...` : 'No token'}
           </Text>
 
-          <Pressable style={styles.logoutButton} onPress={handleLogout}>
-            <Text style={styles.logoutText}>Logout</Text>
+          <Pressable style={[styles.logoutButton, { backgroundColor: colors.error }]} onPress={handleLogout}>
+            <Text style={[styles.logoutText, { color: colors.textInverse }]}>Logout</Text>
           </Pressable>
         </View>
       ) : (
-        <Text style={styles.info}>Not authenticated</Text>
+        <Text style={[styles.info, { color: colors.textSecondary }]}>Not authenticated</Text>
       )}
     </ThemedView>
   );
@@ -61,7 +63,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
     paddingHorizontal: 20,
   },
   title: {
@@ -76,32 +77,27 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1A1A1A',
     marginBottom: 8,
   },
   info: {
     fontSize: 14,
-    color: '#767779',
     marginBottom: 6,
     paddingLeft: 8,
   },
   tokenText: {
     fontSize: 12,
-    color: '#9A9A9A',
     fontFamily: 'monospace',
     marginBottom: 6,
     paddingLeft: 8,
   },
   logoutButton: {
     marginTop: 32,
-    backgroundColor: '#FF3B30',
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 12,
     alignItems: 'center',
   },
   logoutText: {
-    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },

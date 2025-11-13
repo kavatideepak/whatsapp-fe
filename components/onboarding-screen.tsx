@@ -2,17 +2,20 @@ import { router } from 'expo-router';
 import React from 'react';
 import { Dimensions, Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Colors } from '../constants/theme';
+import { useTheme } from '../hooks/useTheme';
 
 const { width } = Dimensions.get('window');
 
 export default function OnboardingScreen() {
+  const { colors } = useTheme();
+  
   const handleGetStarted = () => {
     // Navigate to phone verification
     router.push('/verify-phone');
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.topSection}>
         <Image
           source={require('../assets/images/synapse_logo.png')}
@@ -28,18 +31,18 @@ export default function OnboardingScreen() {
 
       <View style={styles.contentSection}>
         <View>
-          <Text style={styles.heading}>
+          <Text style={[styles.heading, { color: colors.text }]}>
             Effortless collaboration that brings teams together
           </Text>
 
-          <Text style={styles.description}>
+          <Text style={[styles.description, { color: colors.textSecondary }]}>
             Synapse helps you connect instantly, share ideas effortlessly, and stay aligned with your team in one secure space. Collaboration becomes smooth, fast, and distraction-free—so work flows naturally.
           </Text>
         </View>
 
         <View style={styles.buttonContainer}>
-          <Pressable style={styles.button} onPress={handleGetStarted}>
-            <Text style={styles.buttonText}>Get Started</Text>
+          <Pressable style={[styles.button, { backgroundColor: colors.buttonPrimary }]} onPress={handleGetStarted}>
+            <Text style={[styles.buttonText, { color: colors.buttonPrimaryText }]}>Get Started</Text>
           </Pressable>
         </View>
       </View>
@@ -50,7 +53,6 @@ export default function OnboardingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
   },
   topSection: {
     flex: 1,
@@ -80,7 +82,6 @@ const styles = StyleSheet.create({
     fontSize: 26,
     lineHeight: 36,
     letterSpacing: -1,
-    color: '#1A1A1A',
     marginBottom: 16,
   },
   description: {
@@ -88,7 +89,6 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     fontSize: 15,
     lineHeight: 24,
-    color: '#8E8E93',
     marginBottom: 24,
   },
   buttonContainer: {
@@ -96,7 +96,6 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   button: {
-    backgroundColor: '#000',
     paddingVertical: 16,
     paddingHorizontal: 32,
     borderRadius: 12,
@@ -104,7 +103,6 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   buttonText: {
-    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
     fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'SF Pro Text',

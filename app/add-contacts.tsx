@@ -19,6 +19,7 @@ import * as Contacts from 'expo-contacts';
 import { ThemedView } from '../components/themed-view';
 import { matchContacts, addCorporateContacts, getCorporateContacts } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../hooks/useTheme';
 
 type CorporateContact = {
   id: number;
@@ -39,6 +40,7 @@ type ContactSection = {
 };
 
 export default function AddContactsScreen() {
+  const { colors } = useTheme();
   const router = useRouter();
   const params = useLocalSearchParams();
   const { user: currentUser } = useAuth(); // Get logged-in user
@@ -268,13 +270,14 @@ export default function AddContactsScreen() {
           onPress={() => toggleSelect(item.id, isOnSynapse)}
           style={[
             styles.checkbox, 
-            isSelected && styles.checkboxSelected,
+            { borderColor: colors.text },
+            isSelected && [styles.checkboxSelected, { backgroundColor: colors.accent }],
             !isOnSynapse && styles.checkboxDisabled
           ]}
           disabled={!isOnSynapse}
         >
           {isSelected ? (
-            <Ionicons name="checkmark" size={14} color="#fff" />
+            <Ionicons name="checkmark" size={14} color={colors.background} />
           ) : (
             <View />
           )}
@@ -282,27 +285,27 @@ export default function AddContactsScreen() {
 
         <View style={styles.contactInfo}>
           <View style={styles.nameRow}>
-            <Text style={[styles.contactName, !isOnSynapse && styles.textDisabled]} numberOfLines={1}>
+            <Text style={[styles.contactName, { color: colors.text }, !isOnSynapse && [styles.textDisabled, { color: colors.textSecondary }]]} numberOfLines={1}>
               {item.name}
             </Text>
             {isSelf && (
-              <Text style={styles.youBadge}> (You)</Text>
+              <Text style={[styles.youBadge, { color: colors.accent }]}> (You)</Text>
             )}
             {isOnSynapse ? (
               <View style={styles.synapseBadge}>
-                <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+                <Ionicons name="checkmark-circle" size={14} color={colors.statusOnline} />
               </View>
             ) : (
-              <View style={styles.notOnSynapseBadge}>
-                <Text style={styles.notOnSynapseText}>Not on Synapse</Text>
+              <View style={[styles.notOnSynapseBadge, { backgroundColor: colors.iconButtonBackground }]}>
+                <Text style={[styles.notOnSynapseText, { color: colors.textSecondary }]}>Not on Synapse</Text>
               </View>
             )}
           </View>
-          <Text style={[styles.contactDetail, !isOnSynapse && styles.textDisabled]} numberOfLines={1}>
+          <Text style={[styles.contactDetail, { color: colors.textSecondary }, !isOnSynapse && styles.textDisabled]} numberOfLines={1}>
             {item.job_title || ''}{item.job_title && item.department ? ' • ' : ''}{item.department || ''}
           </Text>
           {item.email && (
-            <Text style={[styles.contactEmail, !isOnSynapse && styles.textDisabled]} numberOfLines={1}>
+            <Text style={[styles.contactEmail, { color: colors.textSecondary }, !isOnSynapse && styles.textDisabled]} numberOfLines={1}>
               {item.email}
             </Text>
           )}
@@ -312,36 +315,36 @@ export default function AddContactsScreen() {
   };
 
   return (
-    <ThemedView style={styles.container}>
-        <View style={styles.topBar}>
-          <Text style={styles.topText}>
+    <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.topBar, { backgroundColor: colors.background }]}>
+          <Text style={[styles.topText, { color: colors.text }]}>
             These are your teammates from the company directory who are in your phone contacts.
           </Text>
           <Pressable 
             onPress={() => isOnboarding ? router.push('/setup-success') : router.back()} 
             style={styles.closeButton}
           >
-            <Ionicons name="close" size={20} color="#1A1A1A" />
+            <Ionicons name="close" size={20} color={colors.text} />
           </Pressable>
         </View>
 
         {/* Synapse status banner */}
         {!loading && totalCount > 0 && (
-          <View style={styles.statusBanner}>
-            <Ionicons name="people" size={16} color="#10B981" />
-            <Text style={styles.statusText}>
+          <View style={[styles.statusBanner, { backgroundColor: colors.statusOnline + '20' }]}>
+            <Ionicons name="people" size={16} color={colors.statusOnline} />
+            <Text style={[styles.statusText, { color: colors.statusOnline }]}>
               {synapseCount} of {totalCount} contacts on Synapse
             </Text>
           </View>
         )}
 
         <View style={styles.content}>
-          <View style={styles.searchContainer}>
-            <Ionicons name="search" size={18} color="#767779" style={{ marginRight: 8 }} />
+          <View style={[styles.searchContainer, { backgroundColor: colors.iconButtonBackground }]}>
+            <Ionicons name="search" size={18} color={colors.textSecondary} style={{ marginRight: 8 }} />
             <TextInput
-              style={styles.searchInput}
+              style={[styles.searchInput, { color: colors.text }]}
               placeholder="Search contacts"
-              placeholderTextColor="#767779"
+              placeholderTextColor={colors.textSecondary}
               value={query}
               onChangeText={setQuery}
               returnKeyType="search"
@@ -350,17 +353,17 @@ export default function AddContactsScreen() {
 
           {loading ? (
             <View style={styles.centerContent}>
-              <ActivityIndicator size="large" color="#1A1A1A" />
+              <ActivityIndicator size="large" color={colors.text} />
             </View>
           ) : error ? (
             <View style={styles.centerContent}>
-              <Text style={styles.errorText}>{error}</Text>
+              <Text style={[styles.errorText, { color: colors.text }]}>{error}</Text>
             </View>
           ) : sections.length === 0 ? (
             <View style={styles.centerContent}>
-              <Ionicons name="people-outline" size={64} color="#D0D0D0" />
-              <Text style={styles.emptyText}>No matching contacts found</Text>
-              <Text style={styles.emptySubtext}>
+              <Ionicons name="people-outline" size={64} color={colors.iconDisabled} />
+              <Text style={[styles.emptyText, { color: colors.text }]}>No matching contacts found</Text>
+              <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
                 Make sure you've granted contacts permission and have company contacts in your phone.
               </Text>
             </View>
@@ -370,8 +373,8 @@ export default function AddContactsScreen() {
               keyExtractor={(item) => item.id.toString()}
               renderItem={({ item }) => renderItem({ item })}
               renderSectionHeader={({ section: { title } }) => (
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>{title}</Text>
+                <View style={[styles.sectionHeader, { backgroundColor: colors.background }]}>
+                  <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>{title}</Text>
                 </View>
               )}
               ItemSeparatorComponent={() => <View style={styles.separator} />}
@@ -385,20 +388,20 @@ export default function AddContactsScreen() {
         <View style={styles.footer}>
           {selectedCount > 0 ? (
             <Pressable
-              style={[styles.addButton, adding && styles.buttonDisabled]}
+              style={[styles.addButton, { backgroundColor: colors.text }, adding && styles.buttonDisabled]}
               onPress={handleAddContacts}
               disabled={adding}
             >
-              <Text style={styles.addButtonText}>
+              <Text style={[styles.addButtonText, { color: colors.background }]}>
                 {adding ? 'Adding...' : `Add ${selectedCount} contact${selectedCount > 1 ? 's' : ''}`}
               </Text>
             </Pressable>
           ) : isOnboarding ? (
             <Pressable
-              style={styles.skipButton}
+              style={[styles.skipButton, { backgroundColor: colors.iconButtonBackground }]}
               onPress={() => router.push('/setup-success')}
             >
-              <Text style={styles.skipButtonText}>Skip for now</Text>
+              <Text style={[styles.skipButtonText, { color: colors.text }]}>Skip for now</Text>
             </Pressable>
           ) : null}
         </View>
@@ -411,7 +414,6 @@ const window = Dimensions.get('window');
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
   },
   topBar: {
     paddingTop: 62,
@@ -420,14 +422,12 @@ const styles = StyleSheet.create({
     paddingLeft: 24,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'transparent',
   },
   topText: {
     flex: 1,
     fontSize: 15,
     lineHeight: 24,
     fontFamily: 'SF Pro Text',
-    color: '#1A1A1A',
     fontWeight: '400',
   },
   closeButton: {
@@ -440,7 +440,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: '#ECFDF5',
     borderRadius: 8,
     flexDirection: 'row',
     alignItems: 'center',
@@ -449,7 +448,6 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#059669',
     fontFamily: 'SF Pro Text',
   },
   content: {
@@ -465,19 +463,16 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: '#767779',
     textAlign: 'center',
   },
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1A1A1A',
     marginTop: 16,
     textAlign: 'center',
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#767779',
     marginTop: 8,
     textAlign: 'center',
     lineHeight: 20,
@@ -487,7 +482,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     marginTop: 6,
     height: 46,
-    backgroundColor: '#F4F4F4',
     borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
@@ -497,14 +491,12 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontFamily: 'SF Pro Text',
-    color: '#1A1A1A',
     height: '100%',
   },
   listContent: {
     paddingBottom: 10,
   },
   sectionHeader: {
-    backgroundColor: '#FFFFFF',
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 8,
@@ -512,7 +504,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#767779',
     fontFamily: 'SF Pro Text',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -532,17 +523,13 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: '#B2B2B2',
     justifyContent: 'center',
     alignItems: 'center',
   },
   checkboxSelected: {
-    backgroundColor: '#1A1A1A',
-    borderColor: '#1A1A1A',
   },
   checkboxDisabled: {
-    borderColor: '#D0D0D0',
-    backgroundColor: '#F5F5F5',
+    opacity: 0.3,
   },
   contactInfo: {
     flex: 1,
@@ -555,31 +542,27 @@ const styles = StyleSheet.create({
   contactName: {
     fontSize: 16,
     fontFamily: 'SF Pro Text',
-    color: '#1A1A1A',
     fontWeight: '600',
     maxWidth: window.width - 170,
   },
   youBadge: {
     fontSize: 15,
     fontFamily: 'SF Pro Text',
-    color: '#767779',
     fontWeight: '500',
     marginLeft: 4,
   },
   contactDetail: {
     marginTop: 2,
     fontSize: 14,
-    color: '#767779',
     fontFamily: 'SF Pro Text',
   },
   contactEmail: {
     marginTop: 1,
     fontSize: 13,
-    color: '#999',
     fontFamily: 'SF Pro Text',
   },
   textDisabled: {
-    color: '#B2B2B2',
+    opacity: 0.5,
   },
   synapseBadge: {
     marginLeft: 6,
@@ -590,13 +573,11 @@ const styles = StyleSheet.create({
     marginLeft: 6,
     paddingHorizontal: 8,
     paddingVertical: 2,
-    backgroundColor: '#FEF3C7',
     borderRadius: 8,
   },
   notOnSynapseText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#92400E',
     fontFamily: 'SF Pro Text',
   },
   separator: {
@@ -635,13 +616,11 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#EBEFF3',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 16,
   },
   skipButtonText: {
-    color: '#1A1A1A',
     fontSize: 16,
     fontFamily: 'SF Pro Text',
     fontWeight: '600',

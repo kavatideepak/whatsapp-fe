@@ -19,6 +19,7 @@ import { TabHeader } from '../../components/tab-header';
 import { useAuth } from '../../context/AuthContext';
 import { createChat, getUserContacts } from '../../services/api';
 import { User } from '../../types/api';
+import { useTheme } from '@/hooks/useTheme';
 
 interface Contact {
   id: number;
@@ -35,6 +36,7 @@ export default function ContactsScreen() {
   const params = useLocalSearchParams();
   const router = useRouter();
   const { user: currentUser } = useAuth();
+  const { colors } = useTheme();
   const [contacts, setContacts] = React.useState<Contact[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -133,41 +135,36 @@ export default function ContactsScreen() {
         disabled={isLoading}
       >
         <View style={styles.contactRow}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{String(item.name?.charAt(0) ?? '')}</Text>
+          <View style={[styles.avatar, { backgroundColor: colors.avatarBackground }]}>
+            <Text style={[styles.avatarText, { color: colors.avatarText }]}>{String(item.name?.charAt(0) ?? '')}</Text>
           </View>
           <View style={styles.info}>
-            <Text style={styles.name}>{String(item.name ?? '')}</Text>
-            <Text style={styles.phone}>{String(item.phone_number ?? '')}</Text>
+            <Text style={[styles.name, { color: colors.text }]}>{String(item.name ?? '')}</Text>
+            <Text style={[styles.phone, { color: colors.textSecondary }]}>{String(item.phone_number ?? '')}</Text>
             {item.department && (
-              <Text style={styles.department}>{item.department}</Text>
+              <Text style={[styles.department, { color: colors.textTertiary }]}>{item.department}</Text>
             )}
           </View>
-          {/* {isLoading ? (
-            <ActivityIndicator size="small" color="#1A1A1A" />
-          ) : (
-            <Ionicons name="chevron-forward" size={20} color="#B2B2B2" />
-          )} */}
         </View>
       </TouchableOpacity>
     );
   };
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <TabHeader />
 
       {/* Title */}
-      <Text style={styles.title}>Contacts</Text>
+      <Text style={[styles.title, { color: colors.text }]}>Contacts</Text>
 
       {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#767779" />
+      <View style={[styles.searchContainer, { backgroundColor: colors.backgroundTertiary }]}>
+        <Ionicons name="search" size={20} color={colors.textSecondary} />
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, { color: colors.text }]}
           placeholder="Search for a contact"
-          placeholderTextColor="#767779"
+          placeholderTextColor={colors.textSecondary}
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
@@ -175,26 +172,26 @@ export default function ContactsScreen() {
 
       {loading ? (
         <View style={styles.centerContent}>
-          <ActivityIndicator size="large" color="#1A1A1A" />
+          <ActivityIndicator size="large" color={colors.accent} />
         </View>
       ) : error ? (
         <View style={styles.centerContent}>
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={[styles.errorText, { color: colors.textSecondary }]}>{error}</Text>
         </View>
       ) : filteredContacts.length === 0 ? (
         <View style={styles.centerContent}>
-          <Ionicons name="people-outline" size={64} color="#D0D0D0" />
-          <Text style={styles.emptyTitle}>No contacts yet</Text>
-          <Text style={styles.emptySubtext}>
+          <Ionicons name="people-outline" size={64} color={colors.iconDisabled} />
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>No contacts yet</Text>
+          <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
             {searchQuery ? 'No contacts match your search' : 'Add contacts from your company directory to start chatting'}
           </Text>
           {!searchQuery && (
             <TouchableOpacity 
-              style={styles.addButton}
+              style={[styles.addButton, { backgroundColor: colors.buttonPrimary }]}
               onPress={() => router.push('/add-contacts')}
               activeOpacity={0.8}
             >
-              <Text style={styles.addButtonText}>Add Contacts</Text>
+              <Text style={[styles.addButtonText, { color: colors.buttonPrimaryText }]}>Add Contacts</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -217,19 +214,16 @@ const window = Dimensions.get('window');
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
   },
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#1A1A1A',
     marginBottom: 16,
     paddingHorizontal: 16,
     fontFamily: 'SF Pro Text',
   },
   searchContainer: {
     height: 43,
-    backgroundColor: '#F4F4F4',
     borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
@@ -243,7 +237,6 @@ const styles = StyleSheet.create({
     height: 43,
     fontSize: 14,
     fontFamily: 'SF Pro Text',
-    color: '#1A1A1A',
   },
   centerContent: {
     flex: 1,
@@ -252,7 +245,6 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: '#767779',
     textAlign: 'center',
   },
   listContent: {
@@ -269,14 +261,12 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#E6E6E6',
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1A1A1A',
   },
   info: {
     flex: 1,
@@ -285,29 +275,24 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1A1A1A',
   },
   phone: {
     marginTop: 2,
     fontSize: 13,
-    color: '#767779',
   },
   department: {
     marginTop: 1,
     fontSize: 12,
-    color: '#999',
     fontStyle: 'italic',
   },
   emptyTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1A1A1A',
     marginTop: 16,
     textAlign: 'center',
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#767779',
     marginTop: 8,
     textAlign: 'center',
     lineHeight: 20,
@@ -315,13 +300,11 @@ const styles = StyleSheet.create({
   },
   addButton: {
     marginTop: 24,
-    backgroundColor: '#1A1A1A',
     paddingHorizontal: 32,
     paddingVertical: 12,
     borderRadius: 24,
   },
   addButtonText: {
-    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },

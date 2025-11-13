@@ -15,10 +15,12 @@ import * as Contacts from 'expo-contacts';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import KeyboardAvoidingWrapper from '../components/keyboard-avoiding-wrapper';
 import { Colors } from '../constants/theme';
+import { useTheme } from '../hooks/useTheme';
 
 const CONTACTS_PERMISSION_KEY = '@contacts_permission_requested';
 
 export default function ContactPermissionsScreen() {
+  const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const [isRequesting, setIsRequesting] = React.useState(false);
   const horizontalPadding = 24;
@@ -118,7 +120,7 @@ export default function ContactPermissionsScreen() {
   };
 
   return (
-    <KeyboardAvoidingWrapper style={styles.container}>
+    <KeyboardAvoidingWrapper style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
         {/* Banner Section */}
         <View style={styles.bannerSection}>
@@ -131,10 +133,10 @@ export default function ContactPermissionsScreen() {
 
         {/* Text Content */}
         <View style={styles.textSection}>
-          <Text style={styles.mainText}>
+          <Text style={[styles.mainText, { color: colors.text }]}>
             Synapse needs access to your device contacts to help you connect with your teammates.
           </Text>
-          <Text style={styles.subText}>
+          <Text style={[styles.subText, { color: colors.text }]}>
             This helps identify your device contacts who are already on Synapse and lets you add them to your in-app contact list.
           </Text>
         </View>
@@ -142,18 +144,18 @@ export default function ContactPermissionsScreen() {
         {/* Bottom Buttons */}
         <View style={styles.buttonContainer}>
           <Pressable 
-            style={[styles.button, styles.skipButton, { width: buttonWidth }]}
+            style={[styles.button, styles.skipButton, { width: buttonWidth, backgroundColor: colors.iconButtonBackground }]}
             onPress={handleSkip}
             disabled={isRequesting}
           >
-            <Text style={styles.skipButtonText}>Skip for now</Text>
+            <Text style={[styles.skipButtonText, { color: colors.text }]}>Skip for now</Text>
           </Pressable>
           <Pressable 
-            style={[styles.button, styles.allowButton, { width: buttonWidth }, isRequesting && styles.buttonDisabled]}
+            style={[styles.button, styles.allowButton, { width: buttonWidth, backgroundColor: colors.text }, isRequesting && styles.buttonDisabled]}
             onPress={handleAllowAccess}
             disabled={isRequesting}
           >
-            <Text style={styles.allowButtonText}>
+            <Text style={[styles.allowButtonText, { color: colors.background }]}>
               {isRequesting ? 'Requesting...' : 'Allow access'}
             </Text>
           </Pressable>
@@ -166,7 +168,6 @@ export default function ContactPermissionsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
   },
   content: {
     flex: 1,
@@ -189,14 +190,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     lineHeight: 30,
     letterSpacing: -1,
-    color: '#1A1A1A',
   },
   subText: {
     fontFamily: 'SF Pro Text',
     fontSize: 16,
     fontWeight: '500',
     lineHeight: 24,
-    color: '#1A1A1A',
   },
   buttonContainer: {
     flexDirection: 'row',
@@ -213,22 +212,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   skipButton: {
-    backgroundColor: '#EBEFF3',
   },
   allowButton: {
-    backgroundColor: '#1A1A1A',
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   skipButtonText: {
-    color: '#1A1A1A',
     fontSize: 16,
     fontWeight: '700',
     fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'SF Pro Text',
   },
   allowButtonText: {
-    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
     fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'SF Pro Text',

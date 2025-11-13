@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { useTheme } from '@/hooks/useTheme';
 
 interface TabHeaderProps {
   /**
@@ -45,6 +46,8 @@ export function TabHeader({
   showAddButton = true,
   showMenuButton = true,
 }: TabHeaderProps) {
+  const { colors } = useTheme();
+  
   const handleAddPress = () => {
     if (onAddPress) {
       onAddPress();
@@ -62,7 +65,7 @@ export function TabHeader({
   };
 
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, { backgroundColor: colors.background }]}>
       {/* App Logo */}
       <Image
         source={require('../assets/images/Logo_icon.png')}
@@ -74,23 +77,23 @@ export function TabHeader({
       <View style={styles.headerIcons}>
         {showMenuButton && (
           <Pressable 
-            style={styles.iconButton}
+            style={[styles.iconButton, { backgroundColor: colors.iconButtonBackground }]}
             onPress={handleMenuPress}
             accessibilityLabel="Menu"
             accessibilityRole="button"
           >
-            <Ionicons name="ellipsis-horizontal" size={18} color="#1A1A1A" />
+            <Ionicons name="ellipsis-horizontal" size={18} color={colors.icon} />
           </Pressable>
         )}
         
         {showAddButton && (
           <Pressable
-            style={[styles.iconButton, styles.plusButton]}
+            style={[styles.iconButton, { backgroundColor: colors.bubbleSent }]}
             onPress={handleAddPress}
             accessibilityLabel="Add contact"
             accessibilityRole="button"
           >
-            <Ionicons name="add" size={20} color="#FFFFFF" />
+            <Ionicons name="add" size={20} color={colors.buttonPrimaryText} />
           </Pressable>
         )}
       </View>
@@ -108,7 +111,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 24,
-    backgroundColor: '#FFFFFF',
   },
   logo: {
     width: 46.87,
@@ -123,11 +125,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 48,
-    backgroundColor: 'rgba(26, 26, 26, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  plusButton: {
-    backgroundColor: '#1A1A1A',
   },
 });

@@ -17,8 +17,10 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { updateUser } from '../services/api';
 import type { ApiError } from '../types/api';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../hooks/useTheme';
 
 export default function UploadPhotoScreen() {
+  const { colors } = useTheme();
   const params = useLocalSearchParams();
   const phoneNumber = (params.phoneNumber as string) || '';
   const { updateUser: updateAuthUser } = useAuth();
@@ -61,11 +63,11 @@ export default function UploadPhotoScreen() {
   };
 
   return (
-    <KeyboardAvoidingWrapper style={styles.container}>
+    <KeyboardAvoidingWrapper style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
         {/* Avatar Section */}
         <View style={styles.avatarSection}>
-          <View style={styles.avatarContainer}>
+          <View style={[styles.avatarContainer, { borderColor: colors.text }]}>
             <Image
               source={require('../assets/images/avatar.png')}
               style={styles.avatar}
@@ -73,25 +75,25 @@ export default function UploadPhotoScreen() {
             />
           </View>
           <Pressable onPress={handleUploadPhoto}>
-            <Text style={styles.uploadText}>Upload your photo</Text>
+            <Text style={[styles.uploadText, { color: colors.accent }]}>Upload your photo</Text>
           </Pressable>
         </View>
 
         {/* Name Input Section */}
         <View style={styles.nameSection}>
-          <Text style={styles.nameLabel}>Name</Text>
+          <Text style={[styles.nameLabel, { color: colors.text }]}>Name</Text>
           <TextInput
-            style={styles.nameInput}
+            style={[styles.nameInput, { borderColor: colors.separator, backgroundColor: colors.background, color: colors.text }]}
             placeholder="Enter your name"
             value={name}
             onChangeText={setName}
-            placeholderTextColor="#999"
+            placeholderTextColor={colors.textSecondary}
           />
         </View>
 
         {/* Theme Selection Section */}
         <View style={styles.themeSection}>
-          <Text style={styles.themeLabel}>Choose a color theme</Text>
+          <Text style={[styles.themeLabel, { color: colors.text }]}>Choose a color theme</Text>
           <View style={styles.colorContainer}>
             <View style={[styles.colorOption, styles.selectedColorOption]}>
               <View style={[styles.colorCircle, { backgroundColor: '#1A1A1A' }]}>
@@ -115,14 +117,14 @@ export default function UploadPhotoScreen() {
         {/* Bottom Button */}
         <View style={styles.buttonContainer}>
           <Pressable 
-            style={[styles.button, isLoading && styles.buttonDisabled]} 
+            style={[styles.button, { backgroundColor: colors.text }, isLoading && styles.buttonDisabled]} 
             onPress={handleNext}
             disabled={isLoading}
           >
             {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={colors.background} />
             ) : (
-              <Text style={styles.buttonText}>Next</Text>
+              <Text style={[styles.buttonText, { color: colors.background }]}>Next</Text>
             )}
           </Pressable>
         </View>
@@ -134,7 +136,6 @@ export default function UploadPhotoScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
   },
   content: {
     flex: 1,
@@ -149,7 +150,6 @@ const styles = StyleSheet.create({
     height: 140,
     borderRadius: 70,
     borderWidth: 4,
-    borderColor: '#1A1A1A',
     overflow: 'hidden',
     marginBottom: 6,
   },
@@ -162,7 +162,6 @@ const styles = StyleSheet.create({
     fontFamily: 'SF Pro Text',
     fontSize: 17,
     fontWeight: '600',
-    color: '#016EEB',
     textAlign: 'center',
   },
   nameSection: {
@@ -174,22 +173,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '400',
     lineHeight: 18,
-    color: '#1A1A1A',
   },
   nameInput: {
     height: 44,
     borderRadius: 10,
     borderWidth: 0.33,
-    borderColor: '#BBBBBB',
-    backgroundColor: Platform.select({
-      ios: '#FFFFFF',
-      android: '#FFFFFF08',
-    }),
     paddingHorizontal: 12,
     paddingVertical: 5,
     fontFamily: 'SF Pro Text',
     fontSize: 17,
-    color: '#1A1A1A',
   },
   themeSection: {
     marginTop: 40,
@@ -200,7 +192,6 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     lineHeight: 18,
     letterSpacing: -0.3, // -2% of font size
-    color: '#1A1A1A',
     marginBottom: 16,
   },
   colorContainer: {
@@ -243,7 +234,6 @@ const styles = StyleSheet.create({
     paddingBottom: 56,
   },
   button: {
-    backgroundColor: '#000',
     paddingVertical: 16,
     paddingHorizontal: 32,
     borderRadius: 12,
@@ -254,7 +244,6 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   buttonText: {
-    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
     fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'SF Pro Text',

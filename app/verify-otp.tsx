@@ -19,8 +19,10 @@ import { Colors } from '../constants/theme';
 import { useAuth } from '../context/AuthContext';
 import { verifyOtp, requestOtp } from '../services/api';
 import type { ApiError } from '../types/api';
+import { useTheme } from '../hooks/useTheme';
 
 export default function VerifyOtpScreen() {
+  const { colors } = useTheme();
   const params = useLocalSearchParams();
   const phoneNumber = (params.phoneNumber as string) || '';
   const { login } = useAuth();
@@ -251,16 +253,16 @@ export default function VerifyOtpScreen() {
   };
 
   return (
-    <KeyboardAvoidingWrapper style={styles.container}>
+    <KeyboardAvoidingWrapper style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Main Content */}
       <View style={styles.content}>
           {/* Header Section */}
         <View style={styles.headerSection}>
-          <Text style={styles.title}>Verifying your number</Text>
-          <Text style={styles.description}>
+          <Text style={[styles.title, { color: colors.text }]}>Verifying your number</Text>
+          <Text style={[styles.description, { color: colors.textSecondary }]}>
             Waiting to automatically detect 6-digit code sent by SMS to{' '}
-            <Text style={styles.phoneNumber}>{phoneNumber || '+91 8373627890'}</Text>.{' '}
-            <Text style={styles.link} onPress={handleWrongNumber}>
+            <Text style={[styles.phoneNumber, { color: colors.text }]}>{phoneNumber || '+91 8373627890'}</Text>.{' '}
+            <Text style={[styles.link, { color: colors.accent }]} onPress={handleWrongNumber}>
               Wrong number?
             </Text>
           </Text>
@@ -273,7 +275,8 @@ export default function VerifyOtpScreen() {
               key={index}
               style={[
                 styles.otpInput,
-                digit ? styles.otpInputFilled : null
+                { borderColor: colors.text, backgroundColor: colors.background, color: colors.text },
+                digit ? [styles.otpInputFilled, { borderColor: colors.text }] : null
               ]}
               placeholder=""
               keyboardType="number-pad"
@@ -283,7 +286,7 @@ export default function VerifyOtpScreen() {
                 handleKeyPress(e, index)
               }
               maxLength={1}
-              placeholderTextColor="#999"
+              placeholderTextColor={colors.textSecondary}
               textAlign="center"
               autoFocus={index === 0}
               ref={(el) => {
@@ -296,11 +299,11 @@ export default function VerifyOtpScreen() {
 
            <View style={styles.resendCodeSection}>
             {canResend ? (
-              <Text style={styles.link} onPress={handleResendOtp}>
+              <Text style={[styles.link, { color: colors.accent }]} onPress={handleResendOtp}>
                 {isResending ? 'Sending...' : "Didn't receive code? Resend code"}
               </Text>
             ) : (
-              <Text style={styles.timerText}>
+              <Text style={[styles.timerText, { color: colors.textSecondary }]}>
                 Resend code in {resendTimer}s
               </Text>
             )}
@@ -310,14 +313,14 @@ export default function VerifyOtpScreen() {
       {/* Bottom Button */}
       <View style={styles.buttonContainer}>
         <Pressable 
-          style={[styles.button, isLoading && styles.buttonDisabled]} 
+          style={[styles.button, { backgroundColor: colors.text }, isLoading && styles.buttonDisabled]} 
           onPress={handleVerifyOtp}
           disabled={isLoading}
         >
           {isLoading ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={colors.background} />
           ) : (
-            <Text style={styles.buttonText}>Next</Text>
+            <Text style={[styles.buttonText, { color: colors.background }]}>Verify</Text>
           )}
         </Pressable>
       </View>
@@ -328,7 +331,6 @@ export default function VerifyOtpScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
   },
   innerContainer: {
     flex: 1,
@@ -354,7 +356,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
     textAlign: 'center',
-    color: '#1A1A1A',
   },
   description: {
     fontFamily: 'SF Pro Text',
@@ -363,7 +364,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     letterSpacing: -0.22,
     textAlign: 'center',
-    color: '#1A1A1A',
   },
   phoneNumber: {
     fontFamily: 'SF Pro Text',
@@ -371,7 +371,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     letterSpacing: -0.22,
-    color: '#1A1A1A',
   },
   link: {
     fontFamily: 'SF Pro Text',
@@ -379,7 +378,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     letterSpacing: -0.22,
-    color: '#016EEB',
   },
   timerText: {
     fontFamily: 'SF Pro Text',
@@ -387,7 +385,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 20,
     letterSpacing: -0.22,
-    color: '#666',
     textAlign: 'center',
   },
   otpContainer: {
@@ -401,18 +398,14 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,  // Circular shape
     borderWidth: 1,
-    borderColor: '#1A1A1A',
-    backgroundColor: '#FFFFFF',
     fontFamily: 'SF Pro Text',
     fontWeight: '400',
     fontSize: 17,
     lineHeight: 17,
     letterSpacing: -0.34,
-    color: '#1A1A1A',
     textAlign: 'center',
   },
   otpInputFilled: {
-    borderColor: '#1A1A1A',
     borderWidth: 1.6,
   },
   buttonContainer: {
@@ -428,7 +421,6 @@ const styles = StyleSheet.create({
     marginTop: Platform.OS === 'ios' ? 60 : 40,
   },
   button: {
-    backgroundColor: '#000',
     paddingVertical: 16,
     paddingHorizontal: 32,
     borderRadius: 12,
@@ -439,7 +431,6 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   buttonText: {
-    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
     fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'SF Pro Text',

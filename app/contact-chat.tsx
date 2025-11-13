@@ -2,6 +2,7 @@
 import { useAuth } from '@/context/AuthContext';
 import { useChat } from '@/hooks/useChat';
 import { useSocket } from '@/hooks/useSocket';
+import { useTheme } from '@/hooks/useTheme';
 import { Message as MessageType } from '@/types/api';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -42,6 +43,7 @@ export default function ContactChatScreen() {
   const params = useLocalSearchParams<ChatParams>();
   const router = useRouter();
   const { user } = useAuth();
+  const { colors, isDark } = useTheme();
 
   // Initialize socket connection
   const { isConnected, isAuthenticated } = useSocket();
@@ -234,14 +236,6 @@ export default function ContactChatScreen() {
 
   const renderMessage = ({ item }: { item: MessageType }) => {
     const isFromMe = item.sender_id === user?.id;
-    const bubbleStyle = [
-      styles.bubble,
-      isFromMe ? styles.bubbleRight : styles.bubbleLeft,
-    ];
-    const textStyle = [
-      styles.bubbleText,
-      isFromMe ? styles.textRight : styles.textLeft,
-    ];
 
     // Render message status icon (WhatsApp-like)
     const renderStatus = () => {
@@ -249,25 +243,25 @@ export default function ContactChatScreen() {
 
       switch (item.status) {
         case 'sending':
-          return <Ionicons name="time-outline" size={14} color="#9A9A9A" />;
+          return <Ionicons name="time-outline" size={14} color={colors.statusSending} />;
         case 'sent':
-          return <Ionicons name="checkmark" size={14} color="#9A9A9A" />;
+          return <Ionicons name="checkmark" size={14} color={colors.statusSent} />;
         case 'delivered':
           return (
             <View style={{ flexDirection: 'row', marginLeft: -4 }}>
-              <Ionicons name="checkmark" size={14} color="#9A9A9A" />
-              <Ionicons name="checkmark" size={14} color="#9A9A9A" style={{ marginLeft: -8 }} />
+              <Ionicons name="checkmark" size={14} color={colors.statusDelivered} />
+              <Ionicons name="checkmark" size={14} color={colors.statusDelivered} style={{ marginLeft: -8 }} />
             </View>
           );
         case 'read':
           return (
             <View style={{ flexDirection: 'row', marginLeft: -4 }}>
-              <Ionicons name="checkmark" size={14} color="#4FC3F7" />
-              <Ionicons name="checkmark" size={14} color="#4FC3F7" style={{ marginLeft: -8 }} />
+              <Ionicons name="checkmark" size={14} color={colors.statusRead} />
+              <Ionicons name="checkmark" size={14} color={colors.statusRead} style={{ marginLeft: -8 }} />
             </View>
           );
         case 'failed':
-          return <Ionicons name="alert-circle" size={14} color="#F44336" />;
+          return <Ionicons name="alert-circle" size={14} color={colors.statusFailed} />;
         default:
           return null;
       }
@@ -282,16 +276,30 @@ export default function ContactChatScreen() {
             : { justifyContent: 'flex-start' },
         ]}
       >
-        <View style={bubbleStyle}>
+        <View style={[
+          styles.bubble,
+          isFromMe 
+            ? [styles.bubbleRight, { backgroundColor: colors.bubbleSent }] 
+            : [styles.bubbleLeft, { backgroundColor: colors.bubbleReceived }]
+        ]}>
           {item.is_deleted ? (
-            <Text style={[textStyle, { fontStyle: 'italic', opacity: 0.6 }]}>
+            <Text style={[
+              isFromMe ? styles.textRight : styles.textLeft,
+              { fontStyle: 'italic', opacity: 0.6 },
+              { color: isFromMe ? colors.bubbleSentText : colors.bubbleReceivedText }
+            ]}>
               {item.content}
             </Text>
           ) : (
-            <Text style={textStyle}>{item.content}</Text>
+            <Text style={[
+              isFromMe ? styles.textRight : styles.textLeft,
+              { color: isFromMe ? colors.bubbleSentText : colors.bubbleReceivedText }
+            ]}>
+              {item.content}
+            </Text>
           )}
           <View style={styles.messageFooter}>
-            <Text style={styles.timeText}>
+            <Text style={[styles.timeText, { color: isFromMe ? colors.bubbleSentText : colors.textTertiary }]}>
               {formatTime(item.sent_at || item.created_at || '')}
             </Text>
             {renderStatus()}
@@ -302,7 +310,7 @@ export default function ContactChatScreen() {
   };
 
 return (
-  <SafeAreaView style={{ flex: 1, backgroundColor: '#F7F7F7' }} edges={['top']}>
+  <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -310,21 +318,21 @@ return (
     >
       <ThemedView style={styles.container}>
         {/* Header */}
-        <View style={styles.header}>
+        <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.borderLight }]}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Ionicons name="chevron-back" size={22} color="#1A1A1A" />
+            <Ionicons name="chevron-back" size={22} color={colors.icon} />
           </TouchableOpacity>
 
           {/* Avatar */}
           <View style={styles.avatar}>
-            <Ionicons name="person-circle-outline" size={40} color="#9A9A9A" />
+            <Ionicons name="person-circle-outline" size={40} color={colors.iconTertiary} />
           </View>
 
           <View style={styles.headerTitle}>
-            <Text style={styles.contactName}>
+            <Text style={[styles.contactName, { color: colors.text }]}>
               {contact?.name ?? 'Unknown'}
             </Text>
-            <Text style={styles.contactSub}>
+            <Text style={[styles.contactSub, { color: colors.textSecondary }]}>
               {!isConnected
                 ? 'Connecting...'
                 : !isAuthenticated
@@ -335,30 +343,29 @@ return (
             </Text>
           </View>
 
-          <TouchableOpacity style={styles.menuBtn}>
-            <Ionicons name="ellipsis-horizontal" size={18} color="#1A1A1A" />
+          <TouchableOpacity style={[styles.menuBtn, { backgroundColor: colors.buttonSecondary }]}>
+            <Ionicons name="ellipsis-horizontal" size={18} color={colors.icon} />
           </TouchableOpacity>
         </View>
 
         {/* Chat Background */}
         <ImageBackground
           source={require('@/assets/images/chat_bg.png')}
-          style={styles.chatBackground}
+          style={[styles.chatBackground, { backgroundColor: colors.chatBackground }]}
           imageStyle={styles.chatBackgroundImage}
-          resizeMode="repeat"
         >
           {/* Loading indicator */}
           {isLoading && (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color="#1A1A1A" />
-              <Text style={styles.loadingText}>Loading messages...</Text>
+              <ActivityIndicator size="small" color={colors.icon} />
+              <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading messages...</Text>
             </View>
           )}
 
           {/* Error message */}
           {chatError && (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{chatError}</Text>
+            <View style={[styles.errorContainer, { backgroundColor: isDark ? 'rgba(255, 69, 58, 0.2)' : '#FFE5E5' }]}>
+              <Text style={[styles.errorText, { color: colors.error }]}>{chatError}</Text>
             </View>
           )}
 
@@ -389,12 +396,12 @@ return (
         </ImageBackground>
 
         {/* Input area */}
-        <View style={styles.inputRow}>
-          <View style={styles.inputBox}>
+        <View style={[styles.inputRow, { backgroundColor: colors.backgroundSecondary }]}>
+          <View style={[styles.inputBox, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
             <TextInput
-              style={styles.textInput}
+              style={[styles.textInput, { color: colors.inputText }]}
               placeholder="Message..."
-              placeholderTextColor="#are9A9A9A"
+              placeholderTextColor={colors.inputPlaceholder}
               value={input}
               onChangeText={handleInputChange}
               multiline
@@ -402,11 +409,15 @@ return (
             />
           </View>
           <TouchableOpacity
-            style={[styles.sendBtn, (!isConnected || !isAuthenticated || !input.trim()) && styles.sendBtnDisabled]}
+            style={[
+              styles.sendBtn, 
+              { backgroundColor: colors.sendBtn },
+              (!isConnected || !isAuthenticated || !input.trim()) && styles.sendBtnDisabled
+            ]}
             onPress={handleSend}
             disabled={!isConnected || !isAuthenticated || !input.trim()}
           >
-            <Ionicons name="send" size={20} color="#FFFFFF" />
+            <Ionicons name="send" size={20} color={colors.buttonPrimaryText} />
           </TouchableOpacity>
         </View>
       </ThemedView>
@@ -421,24 +432,20 @@ const window = Dimensions.get('window');
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7F7F7',
   },
   chatBackground: {
     flex: 1,
-    backgroundColor: '#F5F2EB',
   },
   chatBackgroundImage: {
-    opacity: 0.3,
-    resizeMode: 'contain',
+    opacity: 0.25,
+    resizeMode: 'cover',
   },
   header: {
     height: 64,
-    backgroundColor: '#FFFFFF',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
     borderBottomWidth: 0.33,
-    borderBottomColor: 'rgba(0,0,0,0.06)',
   },
   backBtn: {
     width: 44,
@@ -459,29 +466,25 @@ const styles = StyleSheet.create({
   contactName: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1A1A1A',
   },
   contactSub: {
     fontSize: 12,
-    color: '#767779',
     marginTop: 2,
   },
   menuBtn: {
     width: 28,
-       height: 28,
+    height: 28,
     borderRadius: 48,
     justifyContent: 'center',
     alignItems: 'center',
-        backgroundColor: 'rgba(26, 26, 26, 0.08)',
-
   },
 
   listContent: {
     paddingHorizontal: 12,
     paddingTop: 6,
-    paddingBottom: 6, // leaves space for input area
+    paddingBottom: 6,
     fontFamily: 'SF Pro Text',
-    fontWeight: 400,
+    fontWeight: '400',
     fontSize: 15.8,
   },
 
@@ -496,26 +499,21 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   bubbleLeft: {
-    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 6,
   },
   bubbleRight: {
-    backgroundColor: '#111111',
     borderTopRightRadius: 6,
   },
-  bubbleText: {
+  textLeft: {
     fontSize: 14,
     lineHeight: 20,
   },
-  textLeft: {
-    color: '#1A1A1A',
-  },
   textRight: {
-    color: '#FFFFFF',
+    fontSize: 14,
+    lineHeight: 20,
   },
   timeText: {
     fontSize: 11,
-    color: '#9A9A9A',
   },
   messageFooter: {
     flexDirection: 'row',
@@ -536,10 +534,8 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 13,
-    color: '#767779',
   },
   errorContainer: {
-    backgroundColor: '#FFE5E5',
     paddingVertical: 8,
     paddingHorizontal: 12,
     marginHorizontal: 12,
@@ -548,7 +544,6 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 13,
-    color: '#D32F2F',
     textAlign: 'center',
   },
   sendBtnDisabled: {
@@ -559,26 +554,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F7F7F7',
-    paddingBottom: Platform.OS === 'ios' ? 8 : 12,
+    paddingBottom: Platform.OS === 'ios' ? 8 : 22,
     paddingTop: 8,
     borderTopWidth: 0.5,
-    borderTopColor: '#E5E5E5',
   },
   inputBox: {
     flex: 1,
     minHeight: 48,
     maxHeight: 120,
-    backgroundColor: '#FFFFFF',
     borderRadius: 28,
     justifyContent: 'center',
     paddingHorizontal: 16,
     marginRight: 12,
     borderWidth: 0.5,
-    borderColor: '#E5E5E5',
   },
   textInput: {
-    color: '#1A1A1A',
     fontSize: 15,
     maxHeight: 100,
   },
@@ -586,7 +576,6 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#1A1A1A',
     justifyContent: 'center',
     alignItems: 'center',
   },

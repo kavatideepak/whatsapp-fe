@@ -19,6 +19,7 @@ import { router } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { getChats } from '../../services/api';
 import { useSocket } from '../../hooks/useSocket';
+import { useTheme } from '../../hooks/useTheme';
 
 interface Chat {
   id: number;
@@ -51,27 +52,32 @@ interface FilterChipProps {
   label: string;
   isActive: boolean;
   onPress: () => void;
+  colors: any;
 }
 
-const FilterChip = ({ label, isActive, onPress }: FilterChipProps) => (
+const FilterChip = ({ label, isActive, onPress, colors }: FilterChipProps) => (
   <Pressable
-    style={[styles.chip, isActive ? styles.activeChip : styles.inactiveChip]}
+    style={[
+      styles.chip,
+      { backgroundColor: isActive ? colors.bubbleSent : colors.backgroundTertiary }
+    ]}
     onPress={onPress}
   >
-    <ThemedText
+    <Text
       style={[
         styles.chipText,
-        isActive ? styles.activeChipText : styles.inactiveChipText,
+        { color: isActive ? colors.buttonPrimaryText : colors.textSecondary }
       ]}
     >
       {label}
-    </ThemedText>
+    </Text>
   </Pressable>
 );
 
 export default function ChatScreen() {
   const { user } = useAuth();
   const { socket, isConnected } = useSocket();
+  const { colors } = useTheme();
   const [activeFilter, setActiveFilter] = React.useState('All');
   const [chats, setChats] = React.useState<Chat[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -364,18 +370,18 @@ export default function ChatScreen() {
   };
 
   return (
-    <ThemedView style={styles.container}>
+    <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
       <TabHeader />
 
       {/* Search + Filter */}
       <View style={styles.searchAndFiltersContainer}>
-        <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color="#767779" />
+        <View style={[styles.searchContainer, { backgroundColor: colors.backgroundTertiary }]}>
+          <Ionicons name="search" size={20} color={colors.textSecondary} />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: colors.text }]}
             placeholder="Search"
-            placeholderTextColor="#767779"
+            placeholderTextColor={colors.textSecondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
@@ -386,31 +392,35 @@ export default function ChatScreen() {
             label="All"
             isActive={activeFilter === 'All'}
             onPress={() => setActiveFilter('All')}
+            colors={colors}
           />
           <FilterChip
             label="Unread"
             isActive={activeFilter === 'Unread'}
             onPress={() => setActiveFilter('Unread')}
+            colors={colors}
           />
           <FilterChip
             label="Favourites"
             isActive={activeFilter === 'Favourites'}
             onPress={() => setActiveFilter('Favourites')}
+            colors={colors}
           />
           <FilterChip
             label="Groups"
             isActive={activeFilter === 'Groups'}
             onPress={() => setActiveFilter('Groups')}
+            colors={colors}
           />
-          <FilterChip label="+" isActive={false} onPress={() => {}} />
+          <FilterChip label="+" isActive={false} onPress={() => {}} colors={colors} />
         </View>
       </View>
 
       {/* Empty Chat Banner */}
       {loading ? (
         <View style={styles.emptyStateContainer}>
-          <ActivityIndicator size="large" color="#1A1A1A" />
-          <Text style={styles.emptySubtitle}>Loading chats...</Text>
+          <ActivityIndicator size="large" color={colors.icon} />
+          <Text style={[styles.emptySubtitle, { color: colors.accent }]}>Loading chats...</Text>
         </View>
       ) : filteredChats.length === 0 ? (
         <View style={styles.emptyStateContainer}>
@@ -419,13 +429,13 @@ export default function ChatScreen() {
             style={styles.emptyBanner}
             resizeMode="contain"
           />
-          <Text style={styles.emptyTitle}>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>
             No conversations yet. Let's get the conversation started
           </Text>
-          <Text style={styles.emptySubtitle}>Start a chat</Text>
+          <Text style={[styles.emptySubtitle, { color: colors.accent }]}>Start a chat</Text>
           {/* Debug info */}
           {__DEV__ && (
-            <Text style={{ marginTop: 10, fontSize: 12, color: '#999' }}>
+            <Text style={{ marginTop: 10, fontSize: 12, color: colors.textTertiary }}>
               Debug: Total chats: {chats.length}, Filtered: {filteredChats.length}
             </Text>
           )}
@@ -453,7 +463,6 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
   },
   searchAndFiltersContainer: {
     paddingTop: 5,
@@ -464,7 +473,6 @@ const styles = StyleSheet.create({
   },
   searchContainer: {
     height: 43,
-    backgroundColor: '#F4F4F4',
     borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
@@ -476,7 +484,6 @@ const styles = StyleSheet.create({
     height: 43,
     fontSize: 14,
     fontFamily: 'SF Pro Text',
-    color: '#1A1A1A',
   },
   filterContainer: {
     height: 34,
@@ -495,24 +502,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  activeChip: {
-    backgroundColor: '#1A1A1A',
-  },
-  inactiveChip: {
-    backgroundColor: '#F4F4F4',
-  },
   chipText: {
     fontSize: 14,
     fontWeight: '600',
     fontFamily: 'SF Pro Text',
     letterSpacing: -0.14,
     lineHeight: 19,
-  },
-  activeChipText: {
-    color: '#FFFFFF',
-  },
-  inactiveChipText: {
-    color: '#767779',
   },
 
   // 🟦 Empty state styles
@@ -532,7 +527,6 @@ const styles = StyleSheet.create({
   emptyTitle: {
     textAlign: 'center',
     fontSize: 16,
-    color: '#1A1A1A',
     fontFamily: 'SF Pro Text',
     fontWeight: '400',
     lineHeight: 22,
@@ -540,9 +534,8 @@ const styles = StyleSheet.create({
   },
   emptySubtitle: {
     fontSize: 15,
-    color: '#016EEB',
     fontFamily: 'SF Pro Text',
-    fontWeight: '500',
+    fontWeight: '700',
     lineHeight: 20,
     letterSpacing: -0.22,
     textAlign: 'center',
