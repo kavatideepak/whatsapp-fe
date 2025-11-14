@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import React from 'react';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 import { useTheme } from '@/hooks/useTheme';
+import { useAuth } from '@/context/AuthContext';
 
 interface TabHeaderProps {
   /**
@@ -25,6 +26,11 @@ interface TabHeaderProps {
    * @default true
    */
   showMenuButton?: boolean;
+  /**
+   * Show profile picture instead of logo
+   * @default false
+   */
+  showProfile?: boolean;
 }
 
 /**
@@ -45,8 +51,18 @@ export function TabHeader({
   onAddPress,
   showAddButton = true,
   showMenuButton = true,
+  showProfile = false,
 }: TabHeaderProps) {
   const { colors } = useTheme();
+  const { user } = useAuth();
+  
+  // Debug: Log user profile pic
+  React.useEffect(() => {
+    if (showProfile) {
+      console.log('👤 TabHeader - User profile_pic:', user?.profile_pic);
+      console.log('👤 TabHeader - User data:', JSON.stringify(user, null, 2));
+    }
+  }, [user?.profile_pic, showProfile]);
   
   const handleAddPress = () => {
     if (onAddPress) {
@@ -64,14 +80,34 @@ export function TabHeader({
     // If no callback provided, button just shows but does nothing
   };
 
+  const handleProfilePress = () => {
+    router.push('/(tabs)/settings');
+  };
+
   return (
     <View style={[styles.header, { backgroundColor: colors.background }]}>
-      {/* App Logo */}
-      <Image
-        source={require('../assets/images/Logo_icon.png')}
-        style={styles.logo}
-        resizeMode="contain"
-      />
+      {/* App Logo or Profile Picture */}
+      {showProfile && user ? (
+        <Pressable onPress={handleProfilePress} style={styles.profileContainer}>
+          {user.profile_pic ? (
+            <Image
+              source={{ uri: user.profile_pic }}
+              style={styles.profilePic}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={[styles.profilePicPlaceholder, { backgroundColor: colors.avatarBackground }]}>
+              <Ionicons name="person" size={20} color={colors.avatarText} />
+            </View>
+          )}
+        </Pressable>
+      ) : (
+        <Image
+          source={require('../assets/images/Logo_icon.png')}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+      )}
 
       {/* Action Buttons */}
       <View style={styles.headerIcons}>
@@ -115,6 +151,22 @@ const styles = StyleSheet.create({
   logo: {
     width: 46.87,
     height: 24.7,
+  },
+  profileContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    overflow: 'hidden',
+  },
+  profilePic: {
+    width: '100%',
+    height: '100%',
+  },
+  profilePicPlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerIcons: {
     flexDirection: 'row',

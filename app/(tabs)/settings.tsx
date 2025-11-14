@@ -1,18 +1,27 @@
 import { useRouter } from 'expo-router';
-import React from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View, Alert, TextInput, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { ThemedText } from '../../components/themed-text';
 import { ThemedView } from '../../components/themed-view';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme, THEME_COLORS } from '@/hooks/useTheme';
+import { uploadProfilePhoto, updateUser } from '@/services/api';
+import type { ApiError } from '@/types/api';
 
 export default function SettingsScreen() {
-  const { user, isLoading, isAuthenticated, logout } = useAuth();
+  const { user, isLoading, isAuthenticated, logout, updateUser: updateAuthUser } = useAuth();
   const router = useRouter();
   const { colors, selectedThemeId, selectTheme } = useTheme();
   const insets = useSafeAreaInsets();
+  
+  const [isUploading, setIsUploading] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editName, setEditName] = useState(user?.name || '');
+  const [editAbout, setEditAbout] = useState(user?.about || '');
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -20,6 +29,77 @@ export default function SettingsScreen() {
       router.replace('/onboarding');
     } catch (error) {
       console.error('Logout failed:', error);
+    }
+  };
+
+  const handleChangePhoto = async () => {
+    if (!user?.phone_number) return;
+
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (permissionResult.granted === false) {
+        Alert.alert('Permission Required', 'Permission to access camera roll is required!');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setIsUploading(true);
+        try {
+          console.log('📤 Uploading photo:', result.assets[0].uri);
+          const response = await uploadProfilePhoto(
+            user.phone_number,
+            user.name || '',
+            result.assets[0].uri
+          );
+          console.log('✅ Upload response:', JSON.stringify(response, null, 2));
+          console.log('📸 New profile_pic URL:', response.user.profile_pic);
+          await updateAuthUser(response.user);
+          console.log('✅ User updated in auth context');
+          Alert.alert('Success', 'Profile photo updated successfully');
+        } catch (error) {
+          const apiError = error as ApiError;
+          Alert.alert('Upload Failed', apiError.message || 'Failed to upload photo');
+        } finally {
+          setIsUploading(false);
+        }
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
+  };
+
+  const handleOpenEditProfile = () => {
+    setEditName(user?.name || '');
+    setEditAbout(user?.about || '');
+    setEditModalVisible(true);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!user?.phone_number) return;
+
+    setIsSaving(true);
+    try {
+      const response = await updateUser(user.phone_number, {
+        name: editName.trim() || undefined,
+        about: editAbout.trim() || undefined,
+      });
+      await updateAuthUser(response.user);
+      setEditModalVisible(false);
+      Alert.alert('Success', 'Profile updated successfully');
+    } catch (error) {
+      const apiError = error as ApiError;
+      Alert.alert('Update Failed', apiError.message || 'Failed to update profile');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -35,14 +115,22 @@ export default function SettingsScreen() {
     <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Fixed Profile Section */}
       {isAuthenticated && user && (
-        <View style={[styles.profileSection, { backgroundColor: colors.background, paddingTop: insets.top + 16 }]}>
-          <View style={[styles.avatarContainer, { backgroundColor: colors.avatarBackground }]}>
-            {user.profile_pic ? (
+        <Pressable 
+          style={[styles.profileSection, { backgroundColor: colors.background, paddingTop: insets.top + 16 }]}
+          onPress={handleOpenEditProfile}
+        >
+          <Pressable onPress={handleChangePhoto} style={[styles.avatarContainer, { backgroundColor: colors.avatarBackground }]}>
+            {isUploading ? (
+              <ActivityIndicator color={colors.accent} />
+            ) : user.profile_pic ? (
               <Image source={{ uri: user.profile_pic }} style={styles.avatar} />
             ) : (
               <Ionicons name="person" size={40} color={colors.avatarText} />
             )}
-          </View>
+            <View style={[styles.cameraIconContainer, { backgroundColor: colors.accent }]}>
+              <Ionicons name="camera" size={16} color="#FFFFFF" />
+            </View>
+          </Pressable>
           <View style={styles.profileInfo}>
             <Text style={[styles.profileName, { color: colors.text }]}>
               {user.name || 'No name'}
@@ -51,8 +139,8 @@ export default function SettingsScreen() {
               {user.about || 'Hey there! I am using Synapse'}
             </Text>
           </View>
-          <Ionicons name="qr-code-outline" size={24} color={colors.accent} />
-        </View>
+          <Ionicons name="pencil" size={20} color={colors.accent} />
+        </Pressable>
       )}
 
       {/* Scrollable Content */}
@@ -234,6 +322,62 @@ export default function SettingsScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      {/* Edit Profile Modal */}
+      <Modal
+        visible={editModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.separator }]}>
+            <Pressable onPress={() => setEditModalVisible(false)}>
+              <Text style={[styles.modalCancel, { color: colors.accent }]}>Cancel</Text>
+            </Pressable>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Profile</Text>
+            <Pressable onPress={handleSaveProfile} disabled={isSaving}>
+              <Text style={[styles.modalSave, { color: colors.accent }]}>
+                {isSaving ? 'Saving...' : 'Save'}
+              </Text>
+            </Pressable>
+          </View>
+
+          <ScrollView style={styles.modalContent}>
+            <View style={styles.modalField}>
+              <Text style={[styles.modalLabel, { color: colors.textSecondary }]}>Name</Text>
+              <TextInput
+                style={[styles.modalInput, { 
+                  backgroundColor: colors.inputBackground, 
+                  color: colors.text,
+                  borderColor: colors.separator 
+                }]}
+                value={editName}
+                onChangeText={setEditName}
+                placeholder="Enter your name"
+                placeholderTextColor={colors.textSecondary}
+              />
+            </View>
+
+            <View style={styles.modalField}>
+              <Text style={[styles.modalLabel, { color: colors.textSecondary }]}>About</Text>
+              <TextInput
+                style={[styles.modalInput, { 
+                  backgroundColor: colors.inputBackground, 
+                  color: colors.text,
+                  borderColor: colors.separator 
+                }]}
+                value={editAbout}
+                onChangeText={setEditAbout}
+                placeholder="Enter your status"
+                placeholderTextColor={colors.textSecondary}
+                multiline
+                numberOfLines={3}
+              />
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
     </ThemedView>
   );
 }
@@ -261,10 +405,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
+    position: 'relative',
   },
   avatar: {
     width: '100%',
     height: '100%',
+  },
+  cameraIconContainer: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
   profileInfo: {
     flex: 1,
@@ -369,6 +526,53 @@ const styles = StyleSheet.create({
   },
   appVersion: {
     fontSize: 13,
+    fontFamily: 'SF Pro Text',
+  },
+  modalContainer: {
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 0.5,
+  },
+  modalCancel: {
+    fontSize: 16,
+    fontFamily: 'SF Pro Text',
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    fontFamily: 'SF Pro Text',
+  },
+  modalSave: {
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'SF Pro Text',
+  },
+  modalContent: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 24,
+  },
+  modalField: {
+    marginBottom: 24,
+  },
+  modalLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    fontFamily: 'SF Pro Text',
+    marginBottom: 8,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 16,
     fontFamily: 'SF Pro Text',
   },
 });

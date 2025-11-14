@@ -12,10 +12,11 @@ import {
     Alert,
     ActivityIndicator,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import KeyboardAvoidingWrapper from '../components/keyboard-avoiding-wrapper';
 import { Colors } from '../constants/theme';
 import { router, useLocalSearchParams } from 'expo-router';
-import { updateUser } from '../services/api';
+import { updateUser, uploadProfilePhoto } from '../services/api';
 import type { ApiError } from '../types/api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme, THEME_COLORS } from '../hooks/useTheme';
@@ -28,10 +29,33 @@ export default function UploadPhotoScreen() {
   
   const [name, setName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
 
-  const handleUploadPhoto = () => {
-    // Handle photo upload
-    console.log('Upload photo');
+  const handleUploadPhoto = async () => {
+    try {
+      // Request permission
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (permissionResult.granted === false) {
+        Alert.alert('Permission Required', 'Permission to access camera roll is required!');
+        return;
+      }
+
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setPhotoUri(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
+    }
   };
 
   const handleNext = async () => {
@@ -43,7 +67,15 @@ export default function UploadPhotoScreen() {
 
     setIsLoading(true);
     try {
-      const response = await updateUser(phoneNumber, { name: name.trim() });
+      let response;
+      
+      // If photo is uploaded, use uploadProfilePhoto, otherwise use updateUser
+      if (photoUri) {
+        response = await uploadProfilePhoto(phoneNumber, name.trim(), photoUri);
+      } else {
+        response = await updateUser(phoneNumber, { name: name.trim() });
+      }
+      
       console.log('User profile updated successfully:', response);
       
       // Update the user in the auth context with the new data
@@ -70,13 +102,15 @@ export default function UploadPhotoScreen() {
         <View style={styles.avatarSection}>
           <View style={[styles.avatarContainer, { borderColor: colors.accent }]}>
             <Image
-              source={require('../assets/images/avatar.png')}
+              source={photoUri ? { uri: photoUri } : require('../assets/images/avatar.png')}
               style={styles.avatar}
               resizeMode="cover"
             />
           </View>
           <Pressable onPress={handleUploadPhoto}>
-            <Text style={[styles.uploadText, { color: colors.accent }]}>Upload your photo</Text>
+            <Text style={[styles.uploadText, { color: colors.accent }]}>
+              {photoUri ? 'Change photo' : 'Upload your photo'}
+            </Text>
           </Pressable>
         </View>
 

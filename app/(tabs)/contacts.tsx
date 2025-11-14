@@ -7,6 +7,7 @@ import {
   Alert,
   Dimensions,
   FlatList,
+  Image,
   StyleSheet,
   Text,
   TextInput,
@@ -89,7 +90,8 @@ export default function ContactsScreen() {
           contact: JSON.stringify({
             id: item.id.toString(),
             name: item.name,
-            phone: item.phone_number
+            phone: item.phone_number,
+            profile_pic: item.profile_pic,
           }),
           chatId: response.data.chat.id.toString(),
         },
@@ -135,8 +137,16 @@ export default function ContactsScreen() {
         disabled={isLoading}
       >
         <View style={styles.contactRow}>
-          <View style={[styles.avatar, { backgroundColor: colors.avatarBackground }]}>
-            <Text style={[styles.avatarText, { color: colors.avatarText }]}>{String(item.name?.charAt(0) ?? '')}</Text>
+          <View style={[styles.avatar, { backgroundColor: item.profile_pic ? 'transparent' : colors.avatarBackground }]}>
+            {item.profile_pic ? (
+              <Image
+                source={{ uri: item.profile_pic }}
+                style={styles.avatarImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <Text style={[styles.avatarText, { color: colors.avatarText }]}>{String(item.name?.charAt(0) ?? '')}</Text>
+            )}
           </View>
           <View style={styles.info}>
             <Text style={[styles.name, { color: colors.text }]}>{String(item.name ?? '')}</Text>
@@ -153,7 +163,7 @@ export default function ContactsScreen() {
   return (
     <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <TabHeader />
+      <TabHeader showProfile={true} />
 
       {/* Title */}
       <Text style={[styles.title, { color: colors.text }]}>Contacts</Text>
@@ -263,6 +273,11 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: 48,
+    height: 48,
   },
   avatarText: {
     fontSize: 16,

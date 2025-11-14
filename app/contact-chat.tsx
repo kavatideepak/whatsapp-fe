@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Dimensions,
   FlatList,
+  Image,
   ImageBackground,
   Keyboard,
   KeyboardAvoidingView,
@@ -32,6 +33,7 @@ type Contact = {
   id: string;
   name: string;
   phone: string;
+  profile_pic?: string;
 };
 
 type ChatParams = {
@@ -326,7 +328,15 @@ return (
 
           {/* Avatar */}
           <View style={styles.avatar}>
-            <Ionicons name="person-circle-outline" size={40} color={colors.iconTertiary} />
+            {contact?.profile_pic ? (
+              <Image
+                source={{ uri: contact.profile_pic }}
+                style={styles.avatarImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <Ionicons name="person-circle-outline" size={40} color={colors.iconTertiary} />
+            )}
           </View>
 
           <View style={styles.headerTitle}>
@@ -459,6 +469,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    borderRadius: 20,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: 40,
+    height: 40,
   },
   headerTitle: {
     flex: 1,
@@ -557,7 +573,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingBottom: Platform.OS === 'ios' ? 8 : 22,
     paddingTop: 8,
-    borderTopWidth: 0.5,
+    // borderTopWidth: 0.5,
   },
   inputBox: {
     flex: 1,

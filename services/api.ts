@@ -118,6 +118,80 @@ export async function updateUser(
 }
 
 /**
+ * Upload profile photo with name and phone number
+ */
+export async function uploadProfilePhoto(
+  phoneNumber: string,
+  name: string,
+  photoUri: string
+): Promise<UpdateUserResponse> {
+  try {
+    const token = await getAuthToken();
+    
+    if (!token) {
+      throw {
+        error: 'Unauthorized',
+        message: 'Authentication token not found',
+        statusCode: 401,
+      } as ApiError;
+    }
+
+    const formData = new FormData();
+    
+    // Extract filename from URI
+    const filename = photoUri.split('/').pop() || 'profile.jpg';
+    const match = /\.(\w+)$/.exec(filename);
+    const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+    // Append the image file
+    formData.append('profile_pic', {
+      uri: photoUri,
+      name: filename,
+      type: type,
+    } as any);
+    
+    // Append other fields
+    formData.append('phone_number', phoneNumber);
+    formData.append('name', name);
+
+    const response = await fetch(buildUrl(API_ENDPOINTS.users.update), {
+      method: 'PUT',
+      body: formData,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        // Note: Don't set Content-Type for FormData, let the browser/RN set it with boundary
+      },
+    });
+
+    const data = await response.json();
+    
+    console.log('📡 Upload API Response Status:', response.status);
+    console.log('📡 Upload API Response Data:', JSON.stringify(data, null, 2));
+
+    if (!response.ok) {
+      throw {
+        error: data.error || 'Upload failed',
+        message: data.message,
+        statusCode: response.status,
+      } as ApiError;
+    }
+
+    return data as UpdateUserResponse;
+  } catch (error) {
+    // If it's already an ApiError, re-throw it
+    if ((error as ApiError).error) {
+      throw error;
+    }
+    
+    // Handle network errors
+    throw {
+      error: 'Network error',
+      message: 'Failed to upload photo. Please check your connection.',
+    } as ApiError;
+  }
+}
+
+/**
  * Get all users from the directory
  */
 export async function getUsers(): Promise<GetUsersResponse> {

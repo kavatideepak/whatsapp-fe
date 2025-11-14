@@ -273,6 +273,7 @@ export default function ChatScreen() {
         id: otherUserId.toString(),
         name: otherUser?.name || 'Unknown',
         phone: '', // We don't have phone in chat response, but contact-chat doesn't strictly need it
+        profile_pic: otherUser?.profile_pic,
       };
       
       console.log('📱 Navigating with contact:', contactData);
@@ -372,7 +373,7 @@ export default function ChatScreen() {
   return (
     <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <TabHeader />
+      <TabHeader showProfile={true} />
 
       {/* Search + Filter */}
       <View style={styles.searchAndFiltersContainer}>
