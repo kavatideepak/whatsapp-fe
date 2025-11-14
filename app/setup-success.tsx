@@ -11,14 +11,16 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { Colors } from '../constants/theme';
+import { useTheme } from '../hooks/useTheme';
 export default function SetupSuccessScreen() {
+  const { colors } = useTheme();
   const router = useRouter();
   const { width } = useWindowDimensions();
   // Calculate image sizes responsively while maintaining aspect ratio
   const backgroundSize = width * 0.75; // 80% of screen width
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Center Success Images */}
       <View style={styles.imageContainer}>
         <Image
@@ -39,23 +41,23 @@ export default function SetupSuccessScreen() {
           <View style={styles.checkIconContainer}>
             <Ionicons name="checkmark" size={10} color="#fff" />
           </View>
-          <Text style={styles.statusText}>Your profile setup is done!</Text>
+          <Text style={[styles.statusText, { color: colors.text }]}>Your profile setup is done!</Text>
         </View>
         <View style={styles.statusRow}>
           <View style={styles.checkIconContainer}>
             <Ionicons name="checkmark" size={10} color="#fff" />
           </View>
-          <Text style={styles.statusText}>We've added existing contacts to your Synapse contacts list.</Text>
+          <Text style={[styles.statusText, { color: colors.text }]}>We've added existing contacts to your Synapse contacts list.</Text>
         </View>
       </View>
 
       {/* Bottom Button */}
       <View style={styles.buttonContainer}>
         <Pressable 
-          style={styles.button}
+          style={[styles.button, { backgroundColor: colors.text }]}
           onPress={() => router.replace('/(tabs)/chat')}
         >
-          <Text style={styles.buttonText}>Get Started</Text>
+          <Text style={[styles.buttonText, { color: colors.background }]}>Get Started</Text>
         </Pressable>
       </View>
     </View>
@@ -65,7 +67,6 @@ export default function SetupSuccessScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
   },
   imageContainer: {
     flex: 1,
@@ -90,7 +91,6 @@ const styles = StyleSheet.create({
     paddingBottom: 56,
   },
   button: {
-    backgroundColor: '#000',
     paddingVertical: 16,
     paddingHorizontal: 32,
     borderRadius: 12,
@@ -98,7 +98,6 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   buttonText: {
-    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
     fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'SF Pro Text',
@@ -129,6 +128,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '400',
     lineHeight: 23,
-    color: '#1A1A1A',
   },
 });

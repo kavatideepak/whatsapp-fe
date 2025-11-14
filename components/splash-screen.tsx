@@ -3,9 +3,11 @@ import React, { useEffect } from 'react';
 import { Image, Platform, StyleSheet, Text, View } from 'react-native';
 import { Colors } from '../constants/theme';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../hooks/useTheme';
 
 export default function SplashScreen() {
   const { isAuthenticated, isLoading } = useAuth();
+  const { colors } = useTheme();
 
   useEffect(() => {
     // Wait for auth to finish loading, then navigate
@@ -25,7 +27,7 @@ export default function SplashScreen() {
   }, [isLoading, isAuthenticated]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
         <Image
           source={require('../assets/images/synapse_logo.png')}
@@ -33,7 +35,7 @@ export default function SplashScreen() {
           resizeMode="contain"
         />
       </View>
-      <Text style={styles.poweredBy}>
+      <Text style={[styles.poweredBy, { color: colors.textSecondary }]}>
         Powered by Graviti Pharma
       </Text>
     </View>
@@ -43,7 +45,6 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
   },
   content: {
     flex: 1,
@@ -56,7 +57,6 @@ const styles = StyleSheet.create({
   },
   poweredBy: {
     fontSize: 14,
-    color: '#8E8E93',
     fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'normal',
     marginBottom: 48,
     textAlign:'center',

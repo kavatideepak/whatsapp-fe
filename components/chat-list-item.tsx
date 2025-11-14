@@ -1,6 +1,7 @@
 import React from 'react';
 import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '@/hooks/useTheme';
 
 interface ChatListItemProps {
   /**
@@ -68,6 +69,8 @@ export function ChatListItem({
   isRead = false,
   onPress,
 }: ChatListItemProps) {
+  const { colors } = useTheme();
+  
   // Generate initials from name for avatar placeholder
   const initials = name
     .split(' ')
@@ -83,7 +86,10 @@ export function ChatListItem({
 
   return (
     <TouchableOpacity
-      style={styles.container}
+      style={[styles.container, { 
+        backgroundColor: colors.background, 
+        borderBottomColor: colors.separator 
+      }]}
       onPress={onPress}
       activeOpacity={0.7}
     >
@@ -92,8 +98,8 @@ export function ChatListItem({
         {avatar ? (
           <Image source={{ uri: avatar }} style={styles.avatar} />
         ) : (
-          <View style={[styles.avatar, styles.avatarPlaceholder]}>
-            <Text style={styles.avatarText}>{initials}</Text>
+          <View style={[styles.avatar, { backgroundColor: colors.avatarBackground }]}>
+            <Text style={[styles.avatarText, { color: colors.avatarText }]}>{initials}</Text>
           </View>
         )}
       </View>
@@ -102,10 +108,10 @@ export function ChatListItem({
       <View style={styles.chatInfo}>
         {/* Name and Time Row */}
         <View style={styles.topRow}>
-          <Text style={styles.name} numberOfLines={1}>
+          <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
             {name}
           </Text>
-          {time && <Text style={styles.time}>{time}</Text>}
+          {time && <Text style={[styles.time, { color: colors.textSecondary }]}>{time}</Text>}
         </View>
 
         {/* Message Preview and Badge Row */}
@@ -118,7 +124,7 @@ export function ChatListItem({
                   <Ionicons
                     name="checkmark-done"
                     size={16}
-                    color="#4FC3F7"
+                    color={colors.statusRead}
                     style={styles.statusIcon}
                   />
                 )}
@@ -126,7 +132,7 @@ export function ChatListItem({
                   <Ionicons
                     name="checkmark-done"
                     size={16}
-                    color="#767779"
+                    color={colors.statusDelivered}
                     style={styles.statusIcon}
                   />
                 )}
@@ -136,8 +142,8 @@ export function ChatListItem({
             <Text
               style={[
                 styles.message,
-                isTyping && styles.typingText,
-                unreadCount > 0 && styles.unreadMessage,
+                { color: unreadCount > 0 ? colors.text : colors.textSecondary },
+                isTyping && { color: colors.statusOnline, fontStyle: 'italic' },
               ]}
               numberOfLines={1}
             >
@@ -147,14 +153,14 @@ export function ChatListItem({
 
           {/* Unread Badge or Typing Indicator */}
           {unreadCount > 0 && !isTyping && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadCount}>{unreadCount}</Text>
+            <View style={[styles.unreadBadge, { backgroundColor: colors.unreadBadge }]}>
+              <Text style={[styles.unreadCount, { color: colors.unreadBadgeText }]}>{unreadCount}</Text>
             </View>
           )}
           
           {isTyping && (
             <View style={styles.typingIndicator}>
-              <Ionicons name="ellipsis-horizontal-circle" size={20} color="#25D366" />
+              <Ionicons name="ellipsis-horizontal-circle" size={20} color={colors.statusOnline} />
             </View>
           )}
         </View>
@@ -169,9 +175,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#F4F4F4',
   },
   avatarContainer: {
     marginRight: 12,
@@ -180,16 +184,12 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-  },
-  avatarPlaceholder: {
-    backgroundColor: '#E0E0E0',
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#767779',
     fontFamily: 'SF Pro Text',
   },
   chatInfo: {
@@ -204,13 +204,11 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1A1A1A',
     fontFamily: 'SF Pro Text',
     flex: 1,
   },
   time: {
     fontSize: 12,
-    color: '#767779',
     fontFamily: 'SF Pro Text',
     marginLeft: 8,
     fontWeight: '400',
@@ -230,22 +228,12 @@ const styles = StyleSheet.create({
   },
   message: {
     fontSize: 14,
-    color: '#767779',
     fontFamily: 'SF Pro Text',
     fontWeight: '400',
     lineHeight: 19,
     flex: 1,
   },
-  unreadMessage: {
-    fontWeight: '500',
-    color: '#1A1A1A',
-  },
-  typingText: {
-    fontStyle: 'italic',
-    color: '#25D366',
-  },
   unreadBadge: {
-    backgroundColor: '#000',
     borderRadius: 10,
     minWidth: 20,
     height: 20,
@@ -257,7 +245,6 @@ const styles = StyleSheet.create({
   unreadCount: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#FFFFFF',
     fontFamily: 'SF Pro Text',
   },
   typingIndicator: {

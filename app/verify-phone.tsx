@@ -6,6 +6,7 @@ import { IconSymbol } from '../components/ui/icon-symbol';
 import { Colors } from '../constants/theme';
 import { requestOtp } from '../services/api';
 import type { ApiError } from '../types/api';
+import { useTheme } from '../hooks/useTheme';
 
 interface Country {
   id: string;
@@ -37,6 +38,7 @@ const COUNTRIES: Country[] = [
 ];
 
 export default function VerifyPhoneScreen() {
+  const { colors } = useTheme();
   const [selectedCountry, setSelectedCountry] = useState<Country>(COUNTRIES[0]); // India as default
   const [phoneNumber, setPhoneNumber] = useState('');
   const [showCountryPicker, setShowCountryPicker] = useState(false);
@@ -84,29 +86,29 @@ export default function VerifyPhoneScreen() {
   };
 
   return (
-    <KeyboardAvoidingWrapper style={styles.container}>
+    <KeyboardAvoidingWrapper style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Main Content */}
       <View style={styles.content}>
         {/* Header Section */}
         <View style={styles.headerSection}>
-          <Text style={styles.title}>Enter your phone number</Text>
-          <Text style={styles.description}>
+          <Text style={[styles.title, { color: colors.text }]}>Enter your phone number</Text>
+          <Text style={[styles.description, { color: colors.textSecondary }]}>
             Synapse will need to verify your phone number. Carrier charges may apply.{' '}
-            <Text style={styles.link} onPress={handleWhatsMyNumber}>
+            <Text style={[styles.link, { color: colors.accent }]} onPress={handleWhatsMyNumber}>
               What's my number?
             </Text>
           </Text>
         </View>
 
         {/* Country Selector */}
-        <Pressable style={styles.countrySelector} onPress={() => setShowCountryPicker(true)}>
+        <Pressable style={[styles.countrySelector, { borderBottomColor: colors.separator }]} onPress={() => setShowCountryPicker(true)}>
           <View style={styles.countryDisplay}>
-            <Text style={styles.countrySelectorText}>{selectedCountry.name}</Text>
+            <Text style={[styles.countrySelectorText, { color: colors.text }]}>{selectedCountry.name}</Text>
           </View>
           <IconSymbol
             name="chevron.down"
             size={24}
-            color="#1A1A1A"
+            color={colors.text}
             style={styles.dropdownIcon}
           />
         </Pressable>
@@ -114,13 +116,13 @@ export default function VerifyPhoneScreen() {
         {/* Phone Input Container */}
         <View style={styles.phoneInputContainer}>
           {/* Country Code */}
-          <View style={styles.countryCodeContainer}>
-            <Text style={styles.countryCodeText}>{selectedCountry.code}</Text>
+          <View style={[styles.countryCodeContainer, { borderBottomColor: colors.text }]}>
+            <Text style={[styles.countryCodeText, { color: colors.text }]}>{selectedCountry.code}</Text>
           </View>
 
           {/* Phone Number Input */}
           <TextInput
-            style={styles.phoneInput}
+            style={[styles.phoneInput, { borderBottomColor: colors.text, color: colors.text, backgroundColor: colors.background }]}
             placeholder="Phone number"
             keyboardType="phone-pad"
             value={phoneNumber}
@@ -131,7 +133,7 @@ export default function VerifyPhoneScreen() {
                 Keyboard.dismiss();
               }
             }}
-            placeholderTextColor="#999"
+            placeholderTextColor={colors.textSecondary}
             maxLength={10}
           />
         </View>
@@ -140,14 +142,14 @@ export default function VerifyPhoneScreen() {
       {/* Bottom Button */}
       <View style={styles.buttonContainer}>
         <Pressable 
-          style={[styles.button, isLoading && styles.buttonDisabled]} 
+          style={[styles.button, { backgroundColor: colors.text }, isLoading && styles.buttonDisabled]} 
           onPress={handleNext}
           disabled={isLoading}
         >
           {isLoading ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={colors.background} />
           ) : (
-            <Text style={styles.buttonText}>Next</Text>
+            <Text style={[styles.buttonText, { color: colors.background }]}>Next</Text>
           )}
         </Pressable>
       </View>
@@ -160,11 +162,11 @@ export default function VerifyPhoneScreen() {
         onRequestClose={() => setShowCountryPicker(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select Country</Text>
+          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.separator }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Select Country</Text>
               <TouchableOpacity onPress={() => setShowCountryPicker(false)}>
-                <IconSymbol name="xmark" size={24} color="#1A1A1A" />
+                <IconSymbol name="xmark" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
             <FlatList
@@ -172,11 +174,11 @@ export default function VerifyPhoneScreen() {
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={styles.countryItem}
+                  style={[styles.countryItem, { borderBottomColor: colors.separator }]}
                   onPress={() => handleCountrySelect(item)}
                 >
-                  <Text style={styles.countryName}>{item.name}</Text>
-                  <Text style={styles.countryCodeInList}>{item.code}</Text>
+                  <Text style={[styles.countryName, { color: colors.text }]}>{item.name}</Text>
+                  <Text style={[styles.countryCodeInList, { color: colors.textSecondary }]}>{item.code}</Text>
                 </TouchableOpacity>
               )}
             />
@@ -190,7 +192,6 @@ export default function VerifyPhoneScreen() {
 const styles = StyleSheet.create<{[key: string]: any}>({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
   },
   content: {
     flex: 1,
@@ -207,7 +208,6 @@ const styles = StyleSheet.create<{[key: string]: any}>({
     fontSize: 24,
     fontWeight: '700',
     textAlign: 'center',
-    color: '#1A1A1A',
   },
   description: {
     fontFamily: 'SF Pro Text',
@@ -216,7 +216,6 @@ const styles = StyleSheet.create<{[key: string]: any}>({
     lineHeight: 20,
     letterSpacing: -0.22,
     textAlign: 'center',
-    color: '#1A1A1A',
   },
   link: {
     fontFamily: 'SF Pro Text',
@@ -224,13 +223,11 @@ const styles = StyleSheet.create<{[key: string]: any}>({
     fontSize: 13,
     lineHeight: 20,
     letterSpacing: -0.22,
-    color: '#016EEB',
   },
   countrySelector: {
     marginTop: 34,
     height: 48,
     borderBottomWidth: 1,
-    borderBottomColor: '#C2C3CB',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -248,7 +245,6 @@ const styles = StyleSheet.create<{[key: string]: any}>({
     fontSize: 17,
     lineHeight: 17,
     letterSpacing: -0.34,
-    color: '#1A1A1A',
   },
   dropdownIcon: {
     width: 24,
@@ -263,7 +259,6 @@ const styles = StyleSheet.create<{[key: string]: any}>({
     width: 60,
     height: 48,
     borderBottomWidth: 0.33,
-    borderBottomColor: '#1A1A1A',
     justifyContent: 'center',
   },
   countryCodeText: {
@@ -272,7 +267,6 @@ const styles = StyleSheet.create<{[key: string]: any}>({
     fontSize: 17,
     lineHeight: 17, // 100% of fontSize
     letterSpacing: -0.34, // -2% of fontSize
-    color: '#1A1A1A',
     textAlign: 'center',
   },
   phoneInput: {
@@ -280,14 +274,11 @@ const styles = StyleSheet.create<{[key: string]: any}>({
     height: 48,
     marginLeft: 12,
     borderBottomWidth: 0.33,
-    borderBottomColor: '#1A1A1A',
-    backgroundColor: '#FFFFFF',
     fontFamily: 'SF Pro Text',
     fontWeight: '400',
     fontSize: 17,
     lineHeight: 17, // 100% of fontSize
     letterSpacing: -0.34, // -2% of fontSize
-    color: '#1A1A1A',
   },
   buttonContainer: {
     paddingHorizontal: 24,
@@ -296,7 +287,6 @@ const styles = StyleSheet.create<{[key: string]: any}>({
     paddingBottom: 56,
   },
   button: {
-    backgroundColor: '#000',
     paddingVertical: 16,
     paddingHorizontal: 32,
     borderRadius: 12,
@@ -307,7 +297,6 @@ const styles = StyleSheet.create<{[key: string]: any}>({
     opacity: 0.6,
   },
   buttonText: {
-    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
     fontFamily: Platform.OS === 'ios' ? 'SF Pro Text' : 'SF Pro Text',
@@ -318,7 +307,6 @@ const styles = StyleSheet.create<{[key: string]: any}>({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '80%',
@@ -331,12 +319,10 @@ const styles = StyleSheet.create<{[key: string]: any}>({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1A1A1A',
     fontFamily: 'SF Pro Text',
   },
   countryItem: {
@@ -345,17 +331,14 @@ const styles = StyleSheet.create<{[key: string]: any}>({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 0.5,
-    borderBottomColor: '#E5E5E5',
   },
   countryName: {
     flex: 1,
     fontSize: 16,
-    color: '#1A1A1A',
     fontFamily: 'SF Pro Text',
   },
   countryCodeInList: {
     fontSize: 16,
-    color: '#666',
     fontFamily: 'SF Pro Text',
   },
 });

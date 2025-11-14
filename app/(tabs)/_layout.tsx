@@ -6,9 +6,11 @@ import { Image, StyleSheet, Text, View } from 'react-native';
 import { getChats } from '@/services/api';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSocket } from '@/hooks/useSocket';
+import { useTheme } from '@/hooks/useTheme';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const { colors, isDark } = useTheme();
   const [totalUnreadCount, setTotalUnreadCount] = React.useState(0);
   const { socket, isConnected } = useSocket();
 
@@ -68,17 +70,17 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#1A1A1A',
+        tabBarActiveTintColor: isDark ? colors.tabIconSelected : colors.accent,
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarStyle: {
-          backgroundColor: '#F3F3F3',
+          backgroundColor: colors.footerTabBackground,
           height: 100,
           paddingHorizontal: 4,
           paddingTop: 3,
           paddingBottom: 2,
           borderTopWidth: 0.33,
-          borderTopColor: 'rgba(26, 26, 26, 0.1)',
+          borderTopColor: colors.borderLight,
         },
         tabBarItemStyle: {
           height: 44,
@@ -91,9 +93,10 @@ export default function TabLayout() {
         tabBarLabelStyle: {
           fontSize: 12,
           fontFamily: 'SF Pro Text',
-          fontWeight: '500',
+          fontWeight: '600',
+          marginTop: 6,
         },
-        tabBarInactiveTintColor: '#767779',
+        tabBarInactiveTintColor: colors.tabIconDefault,
       }}
       initialRouteName="chat">
       <Tabs.Screen
@@ -101,11 +104,16 @@ export default function TabLayout() {
         options={{
           title: 'Calls',
           tabBarIcon: ({ focused }) => (
-            <Image 
-              source={require('../../assets/images/calls.png')}
-              style={[styles.tabIcon, focused && styles.activeIcon]} 
-              resizeMode="contain"
-            />
+            <View style={[
+              styles.iconWrapper,
+              isDark && focused && { backgroundColor: colors.accent, borderRadius: 20 }
+            ]}>
+              <Image 
+                source={require('../../assets/images/calls.png')}
+                style={styles.tabIcon} 
+                resizeMode="contain"
+              />
+            </View>
           ),
         }}
       />
@@ -114,11 +122,19 @@ export default function TabLayout() {
         options={{
           title: 'Contacts',
           tabBarIcon: ({ focused }) => (
-            <Image 
-              source={focused ? require('../../assets/images/contacts_filled.png') : require('../../assets/images/contacts.png')}
-              style={[styles.tabIcon, focused && styles.activeIcon]} 
-              resizeMode="contain"
-            />
+            <View style={[
+              styles.iconWrapper,
+              isDark && focused && { backgroundColor: colors.accent, borderRadius: 20 }
+            ]}>
+              <Image 
+                source={(!isDark && focused) 
+                  ? require('../../assets/images/contacts_filled.png') 
+                  : require('../../assets/images/contacts.png')
+                }
+                style={styles.tabIcon} 
+                resizeMode="contain"
+              />
+            </View>
           ),
         }}
       />
@@ -128,14 +144,25 @@ export default function TabLayout() {
           title: 'Chats',
           tabBarIcon: ({ focused }) => (
             <View style={styles.iconContainer}>
-              <Image 
-                source={focused ? require('../../assets/images/chat_filled.png') : require('../../assets/images/chat.png')}
-                style={[styles.tabIcon, focused && styles.activeIcon]} 
-                resizeMode="contain"
-              />
+              <View style={[
+                styles.iconWrapper,
+                isDark && focused && { backgroundColor: colors.accent, borderRadius: 20 }
+              ]}>
+                <Image 
+                  source={(!isDark && focused) 
+                    ? require('../../assets/images/chat_filled.png') 
+                    : require('../../assets/images/chat.png')
+                  }
+                  style={styles.tabIcon} 
+                  resizeMode="contain"
+                />
+              </View>
               {totalUnreadCount > 0 && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>
+                <View style={[styles.badge, { 
+                  backgroundColor: colors.unreadBadge,
+                  borderColor: colors.footerTabBackground 
+                }]}>
+                  <Text style={[styles.badgeText, { color: colors.unreadBadgeText }]}>
                     {totalUnreadCount > 99 ? '99+' : totalUnreadCount}
                   </Text>
                 </View>
@@ -149,11 +176,16 @@ export default function TabLayout() {
         options={{
           title: 'Settings',
           tabBarIcon: ({ focused }) => (
-            <Image 
-              source={require('../../assets/images/gear.png')}
-              style={[styles.tabIcon, focused && styles.activeIcon]} 
-              resizeMode="contain"
-            />
+            <View style={[
+              styles.iconWrapper,
+              isDark && focused && { backgroundColor: colors.accent, borderRadius: 20 }
+            ]}>
+              <Image 
+                source={require('../../assets/images/gear.png')}
+                style={styles.tabIcon} 
+                resizeMode="contain"
+              />
+            </View>
           ),
         }}
       />
@@ -163,23 +195,28 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   iconContainer: {
-    width: 32,
-    height: 32,
+    width: 56,
+    height: 40,
     position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  iconWrapper: {
+    width: 56,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
   },
   tabIcon: {
-    width: 32,
-    height: 32,
-  },
-  activeIcon: {
-    opacity: 1,
-    tintColor: '#1A1A1A',
+    width: 26,
+    height: 26,
   },
   badge: {
     position: 'absolute',
-    top: -4,
-    right: -8,
-    backgroundColor: '#000',
+    top: -2,
+    right: 6,
     borderRadius: 10,
     minWidth: 18,
     height: 18,
@@ -187,10 +224,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#F3F3F3',
   },
   badgeText: {
-    color: '#FFFFFF',
     fontSize: 11,
     fontWeight: '700',
     lineHeight: 14,
