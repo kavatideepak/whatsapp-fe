@@ -25,7 +25,7 @@
       },
       "edgeToEdgeEnabled": false,
       "predictiveBackGestureEnabled": false,
-      "softwareKeyboardLayoutMode": "resize",
+      "softwareKeyboardLayoutMode": "adjustResize",
       "permissions": [
         "READ_CONTACTS",
         "WRITE_CONTACTS"
