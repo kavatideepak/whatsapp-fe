@@ -335,14 +335,14 @@ export default function ContactChatScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         enabled={Platform.OS === 'ios'}
       >
-        <ThemedView 
+        {/* <ThemedView 
           style={[
             styles.container, 
             Platform.OS === 'android' && keyboardHeight > 0 && { 
               marginBottom: keyboardHeight 
             }
           ]}
-        >
+        > */}
           {/* Header */}
           <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.borderLight }]}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
@@ -464,7 +464,7 @@ export default function ContactChatScreen() {
               <Ionicons name="send" size={20} color={colors.buttonPrimaryText} />
             </TouchableOpacity>
           </View>
-        </ThemedView>
+        {/* </ThemedView>\ */}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
