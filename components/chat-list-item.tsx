@@ -71,13 +71,8 @@ export function ChatListItem({
 }: ChatListItemProps) {
   const { colors } = useTheme();
   
-  // Generate initials from name for avatar placeholder
-  const initials = name
-    .split(' ')
-    .map(n => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
+  // Generate initial (first letter) from name for avatar placeholder
+  const initial = name.charAt(0).toUpperCase();
 
   // Determine message preview text
   const messagePreview = isTyping
@@ -99,7 +94,7 @@ export function ChatListItem({
           <Image source={{ uri: avatar }} style={styles.avatar} />
         ) : (
           <View style={[styles.avatar, { backgroundColor: colors.avatarBackground }]}>
-            <Text style={[styles.avatarText, { color: colors.avatarText }]}>{initials}</Text>
+            <Text style={[styles.avatarText, { color: colors.avatarText }]}>{initial}</Text>
           </View>
         )}
       </View>

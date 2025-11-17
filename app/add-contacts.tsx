@@ -7,6 +7,7 @@ import {
     Alert,
     Dimensions,
     FlatList,
+    Image,
     Pressable,
     SectionList,
     StyleSheet,
@@ -17,7 +18,7 @@ import {
 } from 'react-native';
 import * as Contacts from 'expo-contacts';
 import { ThemedView } from '../components/themed-view';
-import { matchContacts, addCorporateContacts, getCorporateContacts } from '../services/api';
+import { matchContacts, addCorporateContacts, getCorporateContacts, getUserContacts } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../hooks/useTheme';
 
@@ -32,6 +33,7 @@ type CorporateContact = {
   matched: boolean;
   is_on_synapse: boolean;
   synapse_user_id?: number | null;
+  is_already_added?: boolean;
 };
 
 type ContactSection = {
@@ -53,6 +55,8 @@ export default function AddContactsScreen() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [adding, setAdding] = React.useState(false);
+  const [chooseMode, setChooseMode] = React.useState(false);
+  const [addedContactIds, setAddedContactIds] = React.useState<Set<number>>(new Set());
 
   // Fetch device contacts and match with corporate contacts
   React.useEffect(() => {
@@ -83,6 +87,13 @@ export default function AddContactsScreen() {
           });
         }
 
+        // Fetch user's already added contacts
+        const userContactsResponse = await getUserContacts();
+        const userContactIds = new Set<number>(
+          (userContactsResponse.data?.contacts || []).map((c: any) => Number(c.corporate_contact_id))
+        );
+        setAddedContactIds(userContactIds);
+
         // Fetch all corporate contacts and match with device contacts
         // Only call matchContacts if we have phone numbers to match
         const corporateResponse = await getCorporateContacts();
@@ -108,7 +119,8 @@ export default function AddContactsScreen() {
               ...contact,
               matched: matchedIds.has(contact.id),
               is_on_synapse: contact.is_on_synapse || false,
-              synapse_user_id: contact.synapse_user_id || null
+              synapse_user_id: contact.synapse_user_id || null,
+              is_already_added: userContactIds.has(contact.id)
             };
 
             if (matchedIds.has(contact.id)) {
@@ -171,7 +183,12 @@ export default function AddContactsScreen() {
 
   const totalCount = matchedContacts.length + officeContacts.length;
 
-  function toggleSelect(id: number, isOnSynapse: boolean) {
+  function toggleSelect(id: number, isOnSynapse: boolean, isAlreadyAdded: boolean) {
+    // Don't allow selection if already added
+    if (isAlreadyAdded) {
+      return;
+    }
+
     // Only allow selection if contact is on Synapse
     if (!isOnSynapse) {
       Alert.alert(
@@ -258,58 +275,93 @@ export default function AddContactsScreen() {
 
   const selectedCount = Object.keys(selected).length;
 
+  // Filter contacts based on search query
+  const filteredContacts = React.useMemo(() => {
+    if (!query.trim()) return matchedContacts;
+    const q = query.toLowerCase().trim();
+    return matchedContacts.filter(contact => 
+      contact.name.toLowerCase().includes(q) || 
+      contact.phone_number.toLowerCase().includes(q)
+    );
+  }, [matchedContacts, query]);
+
   const renderItem = ({ item }: { item: CorporateContact }) => {
     const isSelected = !!selected[item.id];
     const isOnSynapse = item.is_on_synapse;
     const isSelf = item.synapse_user_id === currentUser?.id; // Check if this is the logged-in user
+    const isAlreadyAdded = item.is_already_added || false;
+    
+    // Check if profile_pic is a valid URL
+    const isValidUrl = (url?: string) => {
+      if (!url) return false;
+      return url.startsWith('http://') || url.startsWith('https://');
+    };
+
+    const hasValidProfilePic = isValidUrl(item.profile_pic);
     
     return (
-      <View style={[styles.contactRow, !isOnSynapse && styles.contactRowDisabled]}>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => toggleSelect(item.id, isOnSynapse)}
-          style={[
-            styles.checkbox, 
-            { borderColor: colors.text },
-            isSelected && [styles.checkboxSelected, { backgroundColor: colors.accent }],
-            !isOnSynapse && styles.checkboxDisabled
-          ]}
-          disabled={!isOnSynapse}
+      <View>
+        <Pressable 
+          style={[styles.contactRow, (!isOnSynapse || isAlreadyAdded) && styles.contactRowDisabled]}
+          onPress={() => chooseMode ? toggleSelect(item.id, isOnSynapse, isAlreadyAdded) : null}
+          disabled={!isOnSynapse || !chooseMode || isAlreadyAdded}
         >
-          {isSelected ? (
-            <Ionicons name="checkmark" size={14} color={colors.background} />
-          ) : (
-            <View />
-          )}
-        </TouchableOpacity>
-
-        <View style={styles.contactInfo}>
-          <View style={styles.nameRow}>
-            <Text style={[styles.contactName, { color: colors.text }, !isOnSynapse && [styles.textDisabled, { color: colors.textSecondary }]]} numberOfLines={1}>
-              {item.name}
-            </Text>
-            {isSelf && (
-              <Text style={[styles.youBadge, { color: colors.accent }]}> (You)</Text>
-            )}
-            {isOnSynapse ? (
-              <View style={styles.synapseBadge}>
-                <Ionicons name="checkmark-circle" size={14} color={colors.statusOnline} />
+          {/* Checkbox or Checkmark icon */}
+          {chooseMode && (
+            isAlreadyAdded ? (
+              // Show checkmark icon for already added contacts
+              <View style={styles.checkboxPlaceholder}>
+                <Ionicons name="checkmark-circle" size={24} color={colors.accent} />
               </View>
             ) : (
-              <View style={[styles.notOnSynapseBadge, { backgroundColor: colors.iconButtonBackground }]}>
-                <Text style={[styles.notOnSynapseText, { color: colors.textSecondary }]}>Not on Synapse</Text>
+              // Show checkbox for selectable contacts
+              <View style={[styles.checkbox, isSelected && { borderColor: colors.accent }]}>
+                {isSelected && (
+                  <View style={[styles.checkboxInner, { backgroundColor: colors.accent }]} />
+                )}
               </View>
+            )
+          )}
+
+          {/* Avatar */}
+          <View style={[styles.avatar, { backgroundColor: hasValidProfilePic ? 'transparent' : colors.avatarBackground, overflow: 'hidden' }]}>
+            {hasValidProfilePic ? (
+              <Image source={{ uri: item.profile_pic }} style={styles.avatarImage} />
+            ) : (
+              <Text style={[styles.avatarText, { color: colors.avatarText }]}>
+                {item.name?.charAt(0)?.toUpperCase() || '?'}
+              </Text>
             )}
           </View>
-          <Text style={[styles.contactDetail, { color: colors.textSecondary }, !isOnSynapse && styles.textDisabled]} numberOfLines={1}>
-            {item.job_title || ''}{item.job_title && item.department ? ' • ' : ''}{item.department || ''}
-          </Text>
-          {item.email && (
-            <Text style={[styles.contactEmail, { color: colors.textSecondary }, !isOnSynapse && styles.textDisabled]} numberOfLines={1}>
-              {item.email}
+
+          <View style={styles.contactInfo}>
+            <Text style={[styles.contactName, { color: colors.text }, (!isOnSynapse || isAlreadyAdded) && [styles.textDisabled, { color: colors.textSecondary }]]} numberOfLines={1}>
+              {item.name}
+            </Text>
+            <Text style={[styles.contactPhone, { color: colors.textSecondary }, (!isOnSynapse || isAlreadyAdded) && styles.textDisabled]} numberOfLines={1}>
+              {item.phone_number}
+            </Text>
+          </View>
+
+          {/* Show "Added" label for already added contacts */}
+          {isAlreadyAdded && (
+            <Text style={[styles.addedLabel, { color: colors.textSecondary }]}>
+              Added
             </Text>
           )}
-        </View>
+
+          {/* Checkmark on right (only when not in choose mode and selected) */}
+          {!chooseMode && isSelected && (
+            <View style={[styles.checkmarkCircle, { backgroundColor: colors.accent }]}>
+              <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+            </View>
+          )}
+        </Pressable>
+        
+        {/* Dotted separator in choose mode */}
+        {/* {chooseMode && (
+          <View style={[styles.dottedSeparator, { borderColor: colors.accent }]} />
+        )} */}
       </View>
     );
   };
@@ -318,32 +370,24 @@ export default function AddContactsScreen() {
     <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={[styles.topBar, { backgroundColor: colors.background }]}>
           <Text style={[styles.topText, { color: colors.text }]}>
-            These are your teammates from the company directory who are in your phone contacts.
+            We found {synapseCount} of your device contacts already on Synapse. Add them to your Synapse contacts list to start collaborating.
           </Text>
-          <Pressable 
-            onPress={() => isOnboarding ? router.push('/setup-success') : router.back()} 
-            style={styles.closeButton}
-          >
-            <Ionicons name="close" size={20} color={colors.text} />
-          </Pressable>
+          {isOnboarding && (
+            <Pressable 
+              onPress={() => router.push('/setup-success')} 
+              style={styles.skipButton}
+            >
+              <Text style={[styles.skipButtonText, { color: colors.accent }]}>Skip</Text>
+            </Pressable>
+          )}
         </View>
-
-        {/* Synapse status banner */}
-        {!loading && totalCount > 0 && (
-          <View style={[styles.statusBanner, { backgroundColor: colors.statusOnline + '20' }]}>
-            <Ionicons name="people" size={16} color={colors.statusOnline} />
-            <Text style={[styles.statusText, { color: colors.statusOnline }]}>
-              {synapseCount} of {totalCount} contacts on Synapse
-            </Text>
-          </View>
-        )}
 
         <View style={styles.content}>
           <View style={[styles.searchContainer, { backgroundColor: colors.iconButtonBackground }]}>
             <Ionicons name="search" size={18} color={colors.textSecondary} style={{ marginRight: 8 }} />
             <TextInput
               style={[styles.searchInput, { color: colors.text }]}
-              placeholder="Search contacts"
+              placeholder="Search for contact"
               placeholderTextColor={colors.textSecondary}
               value={query}
               onChangeText={setQuery}
@@ -359,51 +403,116 @@ export default function AddContactsScreen() {
             <View style={styles.centerContent}>
               <Text style={[styles.errorText, { color: colors.text }]}>{error}</Text>
             </View>
-          ) : sections.length === 0 ? (
+          ) : matchedContacts.length === 0 ? (
             <View style={styles.centerContent}>
               <Ionicons name="people-outline" size={64} color={colors.iconDisabled} />
-              <Text style={[styles.emptyText, { color: colors.text }]}>No matching contacts found</Text>
+              <Text style={[styles.emptyText, { color: colors.text }]}>No contacts found</Text>
               <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-                Make sure you've granted contacts permission and have company contacts in your phone.
+                No matching contacts found on Synapse.
               </Text>
             </View>
           ) : (
-            <SectionList
-              sections={sections}
+            <FlatList
+              data={filteredContacts}
               keyExtractor={(item) => item.id.toString()}
               renderItem={({ item }) => renderItem({ item })}
-              renderSectionHeader={({ section: { title } }) => (
-                <View style={[styles.sectionHeader, { backgroundColor: colors.background }]}>
-                  <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>{title}</Text>
-                </View>
-              )}
-              ItemSeparatorComponent={() => <View style={styles.separator} />}
               contentContainerStyle={styles.listContent}
               showsVerticalScrollIndicator={false}
-              stickySectionHeadersEnabled={false}
             />
           )}
         </View>
 
         <View style={styles.footer}>
-          {selectedCount > 0 ? (
-            <Pressable
-              style={[styles.addButton, { backgroundColor: colors.text }, adding && styles.buttonDisabled]}
-              onPress={handleAddContacts}
-              disabled={adding}
-            >
-              <Text style={[styles.addButtonText, { color: colors.background }]}>
-                {adding ? 'Adding...' : `Add ${selectedCount} contact${selectedCount > 1 ? 's' : ''}`}
-              </Text>
-            </Pressable>
-          ) : isOnboarding ? (
-            <Pressable
-              style={[styles.skipButton, { backgroundColor: colors.iconButtonBackground }]}
-              onPress={() => router.push('/setup-success')}
-            >
-              <Text style={[styles.skipButtonText, { color: colors.text }]}>Skip for now</Text>
-            </Pressable>
-          ) : null}
+          {chooseMode ? (
+            <>
+              <Pressable
+                style={[styles.chooseButton, { backgroundColor: colors.background, borderColor: colors.accent }]}
+                onPress={() => {
+                  // Add all contacts to selection (excluding already added)
+                  const allSelected: Record<number, boolean> = {};
+                  matchedContacts.forEach(contact => {
+                    if (contact.is_on_synapse && !contact.is_already_added) {
+                      allSelected[contact.id] = true;
+                    }
+                  });
+                  setSelected(allSelected);
+                }}
+              >
+                <Text style={[styles.chooseButtonText, { color: colors.accent }]}>Add all {synapseCount} contacts</Text>
+              </Pressable>
+
+              <Pressable
+                style={[styles.addAllButton, { backgroundColor: colors.text }, (adding || selectedCount === 0) && styles.buttonDisabled]}
+                onPress={handleAddContacts}
+                disabled={adding || selectedCount === 0}
+              >
+                <Text style={[styles.addAllButtonText, { color: colors.background }]}>
+                  {adding ? 'Adding...' : `Add selected (${selectedCount})`}
+                </Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <Pressable
+                style={[styles.chooseButton, { backgroundColor: colors.background, borderColor: colors.text }]}
+                onPress={() => setChooseMode(true)}
+              >
+                <Text style={[styles.chooseButtonText, { color: colors.text }]}>Choose contacts</Text>
+              </Pressable>
+
+              <Pressable
+                style={[styles.addAllButton, { backgroundColor: colors.text }, adding && styles.buttonDisabled]}
+                onPress={async () => {
+                  // Select all and add (excluding already added)
+                  const allSelected: Record<number, boolean> = {};
+                  matchedContacts.forEach(contact => {
+                    if (contact.is_on_synapse && !contact.is_already_added) {
+                      allSelected[contact.id] = true;
+                    }
+                  });
+                  setSelected(allSelected);
+                  
+                  // Wait for state to update then add
+                  setTimeout(() => {
+                    const selectedIds = Object.keys(allSelected).map(id => parseInt(id));
+                    if (selectedIds.length === 0) {
+                      Alert.alert('No Contacts', 'No contacts available to add.');
+                      return;
+                    }
+
+                    setAdding(true);
+                    addCorporateContacts(selectedIds)
+                      .then(response => {
+                        setAdding(false);
+                        const { added, existing } = response.data;
+                        Alert.alert(
+                          'Success',
+                          `✓ ${added.length} contact(s) added${existing.length > 0 ? `\n${existing.length} already in your list` : ''}`,
+                          [
+                            {
+                              text: 'OK',
+                              onPress: () => {
+                                router.push('/(tabs)/contacts');
+                              }
+                            }
+                          ]
+                        );
+                        setSelected({});
+                      })
+                      .catch((error: any) => {
+                        setAdding(false);
+                        Alert.alert('Error', error.message || 'Failed to add contacts');
+                      });
+                  }, 100);
+                }}
+                disabled={adding}
+              >
+                <Text style={[styles.addAllButtonText, { color: colors.background }]}>
+                  {adding ? 'Adding...' : `Add all ${synapseCount} contacts`}
+                </Text>
+              </Pressable>
+            </>
+          )}
         </View>
     </ThemedView>
   );
@@ -418,22 +527,27 @@ const styles = StyleSheet.create({
   topBar: {
     paddingTop: 62,
     paddingRight: 16,
-    paddingBottom: 8,
-    paddingLeft: 24,
+    paddingBottom: 16,
+    paddingLeft: 16,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
   },
   topText: {
     flex: 1,
-    fontSize: 15,
-    lineHeight: 24,
+    fontSize: 14,
+    lineHeight: 20,
     fontFamily: 'SF Pro Text',
     fontWeight: '400',
+    paddingRight: 8,
   },
-  closeButton: {
-    marginLeft: 12,
-    padding: 8,
-    borderRadius: 12,
+  skipButton: {
+    paddingVertical: 4,
+  },
+  skipButtonText: {
+    fontSize: 16,
+    fontFamily: 'SF Pro Text',
+    fontWeight: '600',
   },
   statusBanner: {
     marginHorizontal: 16,
@@ -453,6 +567,7 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingHorizontal: 0,
+    backgroundColor: 'transparent',
   },
   centerContent: {
     flex: 1,
@@ -479,9 +594,9 @@ const styles = StyleSheet.create({
   },
   searchContainer: {
     marginHorizontal: 16,
-    marginBottom: 8,
-    marginTop: 6,
-    height: 46,
+    marginBottom: 16,
+    marginTop: 8,
+    height: 44,
     borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
@@ -489,31 +604,19 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 15,
     fontFamily: 'SF Pro Text',
     height: '100%',
   },
   listContent: {
-    paddingBottom: 10,
-  },
-  sectionHeader: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: 'SF Pro Text',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    paddingBottom: 16,
   },
   contactRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 13,
+    paddingVertical: 10,
+    gap: 12,
   },
   contactRowDisabled: {
     opacity: 0.5,
@@ -522,107 +625,108 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    borderWidth: 1.5,
+    borderWidth: 2,
+    borderColor: '#CCCCCC',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  checkboxSelected: {
+  checkboxPlaceholder: {
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  checkboxDisabled: {
-    opacity: 0.3,
+  checkboxInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  dottedSeparator: {
+    marginLeft: 16,
+    marginRight: 16,
+    borderBottomWidth: 1,
+    borderStyle: 'dotted',
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  avatarText: {
+    fontSize: 18,
+    fontWeight: '600',
+    fontFamily: 'SF Pro Text',
   },
   contactInfo: {
     flex: 1,
-    justifyContent: 'center',
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   contactName: {
     fontSize: 16,
     fontFamily: 'SF Pro Text',
-    fontWeight: '600',
-    maxWidth: window.width - 170,
-  },
-  youBadge: {
-    fontSize: 15,
-    fontFamily: 'SF Pro Text',
     fontWeight: '500',
-    marginLeft: 4,
+    marginBottom: 2,
   },
-  contactDetail: {
-    marginTop: 2,
+  contactPhone: {
     fontSize: 14,
-    fontFamily: 'SF Pro Text',
-  },
-  contactEmail: {
-    marginTop: 1,
-    fontSize: 13,
     fontFamily: 'SF Pro Text',
   },
   textDisabled: {
     opacity: 0.5,
   },
-  synapseBadge: {
-    marginLeft: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  notOnSynapseBadge: {
-    marginLeft: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  notOnSynapseText: {
-    fontSize: 10,
-    fontWeight: '600',
-    fontFamily: 'SF Pro Text',
-  },
-  separator: {
-    height: 1,
-    backgroundColor: 'transparent',
-  },
-  footer: {
-    paddingHorizontal: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    zIndex: 20,
-    elevation: 20,
-    backgroundColor: 'transparent',
-    paddingBottom: 45,
-    paddingTop: 8,
-  },
-  addButton: {
-    width: '100%',
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#1A1A1A',
+  checkmarkCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  addedLabel: {
+    fontSize: 14,
+    fontFamily: 'SF Pro Text',
+    fontWeight: '500',
+  },
+  footer: {
     paddingHorizontal: 16,
+    paddingVertical: 16,
+    paddingBottom: 40,
+    flexDirection: 'row',
+    gap: 12,
+    backgroundColor: 'transparent',
+  },
+  chooseButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chooseButtonText: {
+    fontSize: 16,
+    fontFamily: 'SF Pro Text',
+    fontWeight: '600',
+  },
+  addAllButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addAllButtonText: {
+    fontSize: 16,
+    fontFamily: 'SF Pro Text',
+    fontWeight: '600',
   },
   buttonDisabled: {
     opacity: 0.6,
-  },
-  addButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontFamily: 'SF Pro Text',
-    fontWeight: '600',
-  },
-  skipButton: {
-    width: '100%',
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-  },
-  skipButtonText: {
-    fontSize: 16,
-    fontFamily: 'SF Pro Text',
-    fontWeight: '600',
   },
 });

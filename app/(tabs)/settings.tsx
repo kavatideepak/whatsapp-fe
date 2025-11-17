@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View, Alert, TextInput, Modal } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View, Alert, TextInput, Modal, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -22,6 +22,7 @@ export default function SettingsScreen() {
   const [editName, setEditName] = useState(user?.name || '');
   const [editAbout, setEditAbout] = useState(user?.about || '');
   const [isSaving, setIsSaving] = useState(false);
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -29,6 +30,15 @@ export default function SettingsScreen() {
       router.replace('/onboarding');
     } catch (error) {
       console.error('Logout failed:', error);
+    }
+  };
+
+  const handleAvatarPress = () => {
+    // If profile pic exists, show viewer. Otherwise, trigger photo upload
+    if (user?.profile_pic) {
+      setImageViewerVisible(true);
+    } else {
+      handleChangePhoto();
     }
   };
 
@@ -119,7 +129,7 @@ export default function SettingsScreen() {
           style={[styles.profileSection, { backgroundColor: colors.background, paddingTop: insets.top + 16 }]}
           onPress={handleOpenEditProfile}
         >
-          <Pressable onPress={handleChangePhoto} style={[styles.avatarContainer, { backgroundColor: colors.avatarBackground }]}>
+          <Pressable onPress={handleAvatarPress} style={[styles.avatarContainer, { backgroundColor: colors.avatarBackground }]}>
             {isUploading ? (
               <ActivityIndicator color={colors.accent} />
             ) : user.profile_pic ? (
@@ -378,6 +388,74 @@ export default function SettingsScreen() {
           </ScrollView>
         </View>
       </Modal>
+
+      {/* Image Viewer Modal */}
+      <Modal
+        visible={imageViewerVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setImageViewerVisible(false)}
+      >
+        <View style={styles.imageViewerContainer}>
+          <Pressable 
+            style={styles.imageViewerOverlay} 
+            onPress={() => setImageViewerVisible(false)}
+          />
+          
+          <View style={styles.imageViewerContent}>
+            {/* Header */}
+            <View style={[styles.imageViewerHeader, { backgroundColor: colors.background }]}>
+              <View style={styles.imageViewerHeaderLeft}>
+                <Text style={[styles.imageViewerName, { color: colors.text }]}>
+                  {user?.name || 'Profile Photo'}
+                </Text>
+              </View>
+              <Pressable 
+                onPress={() => setImageViewerVisible(false)}
+                style={styles.imageViewerCloseButton}
+              >
+                <Ionicons name="close" size={28} color={colors.text} />
+              </Pressable>
+            </View>
+
+            {/* Image */}
+            <View style={styles.imageViewerImageContainer}>
+              {user?.profile_pic && (
+                <Image 
+                  source={{ uri: user.profile_pic }} 
+                  style={styles.imageViewerImage}
+                  resizeMode="contain"
+                />
+              )}
+            </View>
+
+            {/* Footer Actions */}
+            <View style={[styles.imageViewerFooter, { backgroundColor: colors.background }]}>
+              <Pressable 
+                style={[styles.imageViewerButton, { backgroundColor: colors.accent }]}
+                onPress={() => {
+                  setImageViewerVisible(false);
+                  setTimeout(() => handleChangePhoto(), 300);
+                }}
+              >
+                <Ionicons name="camera" size={20} color="#FFFFFF" />
+                <Text style={styles.imageViewerButtonText}>Change Photo</Text>
+              </Pressable>
+              
+              <Pressable 
+                style={[styles.imageViewerButton, { backgroundColor: colors.iconButtonBackground }]}
+                onPress={() => {
+                  setImageViewerVisible(false);
+                  setTimeout(() => handleOpenEditProfile(), 300);
+                }}
+              >
+                <Ionicons name="pencil" size={20} color={colors.text} />
+                <Text style={[styles.imageViewerButtonText, { color: colors.text }]}>Edit Profile</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ThemedView>
   );
 }
@@ -573,6 +651,67 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
     fontSize: 16,
+    fontFamily: 'SF Pro Text',
+  },
+  imageViewerContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+  },
+  imageViewerOverlay: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  imageViewerContent: {
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  imageViewerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 60,
+    paddingBottom: 16,
+  },
+  imageViewerHeaderLeft: {
+    flex: 1,
+  },
+  imageViewerName: {
+    fontSize: 18,
+    fontWeight: '600',
+    fontFamily: 'SF Pro Text',
+  },
+  imageViewerCloseButton: {
+    padding: 8,
+  },
+  imageViewerImageContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageViewerImage: {
+    width: Dimensions.get('window').width,
+    height: Dimensions.get('window').width,
+  },
+  imageViewerFooter: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    paddingBottom: 40,
+  },
+  imageViewerButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  imageViewerButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
     fontFamily: 'SF Pro Text',
   },
 });

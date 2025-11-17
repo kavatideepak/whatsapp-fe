@@ -328,14 +328,18 @@ return (
 
           {/* Avatar */}
           <View style={styles.avatar}>
-            {contact?.profile_pic ? (
+            {contact?.profile_pic && (contact.profile_pic.startsWith('http://') || contact.profile_pic.startsWith('https://')) ? (
               <Image
                 source={{ uri: contact.profile_pic }}
                 style={styles.avatarImage}
                 resizeMode="cover"
               />
             ) : (
-              <Ionicons name="person-circle-outline" size={40} color={colors.iconTertiary} />
+              <View style={[styles.avatarPlaceholder, { backgroundColor: colors.avatarBackground }]}>
+                <Text style={[styles.avatarText, { color: colors.avatarText }]}>
+                  {contact?.name?.charAt(0)?.toUpperCase() ?? '?'}
+                </Text>
+              </View>
             )}
           </View>
 
@@ -349,7 +353,7 @@ return (
                 : !isAuthenticated
                 ? 'Authenticating...'
                 : typingUsers.size > 0
-                ? 'Typing...'
+                ? 'typing...'
                 : formatLastSeen()}
             </Text>
           </View>
@@ -475,6 +479,17 @@ const styles = StyleSheet.create({
   avatarImage: {
     width: 40,
     height: 40,
+  },
+  avatarPlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 18,
+    fontWeight: '600',
   },
   headerTitle: {
     flex: 1,

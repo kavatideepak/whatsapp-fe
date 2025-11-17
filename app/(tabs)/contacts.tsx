@@ -91,7 +91,7 @@ export default function ContactsScreen() {
             id: item.id.toString(),
             name: item.name,
             phone: item.phone_number,
-            profile_pic: item.profile_pic,
+            profile_pic: item.profile_pic
           }),
           chatId: response.data.chat.id.toString(),
         },
@@ -130,6 +130,14 @@ export default function ContactsScreen() {
   const renderItem = ({ item }: { item: Contact }) => {
     const isLoading = initiatingChat === item.id;
     
+    // Check if profile_pic is a valid URL
+    const isValidUrl = (url?: string) => {
+      if (!url) return false;
+      return url.startsWith('http://') || url.startsWith('https://');
+    };
+
+    const hasValidProfilePic = isValidUrl(item.profile_pic);
+    
     return (
       <TouchableOpacity 
         onPress={() => openChat(item)} 
@@ -137,23 +145,24 @@ export default function ContactsScreen() {
         disabled={isLoading}
       >
         <View style={styles.contactRow}>
-          <View style={[styles.avatar, { backgroundColor: item.profile_pic ? 'transparent' : colors.avatarBackground }]}>
-            {item.profile_pic ? (
-              <Image
-                source={{ uri: item.profile_pic }}
+          <View style={[styles.avatar, { backgroundColor: hasValidProfilePic ? 'transparent' : colors.avatarBackground }]}>
+            {hasValidProfilePic ? (
+              <Image 
+                source={{ uri: item.profile_pic }} 
                 style={styles.avatarImage}
-                resizeMode="cover"
               />
             ) : (
-              <Text style={[styles.avatarText, { color: colors.avatarText }]}>{String(item.name?.charAt(0) ?? '')}</Text>
+              <Text style={[styles.avatarText, { color: colors.avatarText }]}>
+                {String(item.name?.charAt(0)?.toUpperCase() ?? '')}
+              </Text>
             )}
           </View>
           <View style={styles.info}>
             <Text style={[styles.name, { color: colors.text }]}>{String(item.name ?? '')}</Text>
             <Text style={[styles.phone, { color: colors.textSecondary }]}>{String(item.phone_number ?? '')}</Text>
-            {item.department && (
+            {/* {item.department && (
               <Text style={[styles.department, { color: colors.textTertiary }]}>{item.department}</Text>
-            )}
+            )} */}
           </View>
         </View>
       </TouchableOpacity>
@@ -163,7 +172,7 @@ export default function ContactsScreen() {
   return (
     <ThemedView style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <TabHeader showProfile={true} />
+      <TabHeader />
 
       {/* Title */}
       <Text style={[styles.title, { color: colors.text }]}>Contacts</Text>
@@ -278,6 +287,7 @@ const styles = StyleSheet.create({
   avatarImage: {
     width: 48,
     height: 48,
+    borderRadius: 24,
   },
   avatarText: {
     fontSize: 16,
