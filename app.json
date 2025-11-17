@@ -25,7 +25,13 @@
       },
       "edgeToEdgeEnabled": false,
       "predictiveBackGestureEnabled": false,
-      "softwareKeyboardLayoutMode": "adjustResize",
+"android": {
+  "package": "com.synapse.app",
+  "softwareKeyboardLayoutMode": "adjustNothing",
+  "config": {
+    "windowSoftInputMode": "adjustResize|stateAlwaysHidden"
+  }
+},
       "permissions": [
         "READ_CONTACTS",
         "WRITE_CONTACTS"
