@@ -86,6 +86,7 @@ export default function ContactChatScreen() {
   }>({ is_online: false });
   const flatListRef = React.useRef<FlatList>(null);
   const typingTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = React.useState(0);
 
   // Show connection status
   React.useEffect(() => {
@@ -95,6 +96,26 @@ export default function ContactChatScreen() {
       chatId,
     });
   }, [isConnected, isAuthenticated, chatId]);
+
+  // Keyboard event listeners for Android
+  React.useEffect(() => {
+    if (Platform.OS !== 'android') return;
+
+    const keyboardWillShow = Keyboard.addListener('keyboardDidShow', (e) => {
+      // Subtract the bottom inset (navigation bar height) from keyboard height
+      const adjustedHeight = e.endCoordinates.height - insets.bottom;
+      setKeyboardHeight(adjustedHeight);
+    });
+
+    const keyboardWillHide = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      keyboardWillShow.remove();
+      keyboardWillHide.remove();
+    };
+  }, [insets.bottom]);
 
   // Listen for presence updates from socket
   React.useEffect(() => {
@@ -310,10 +331,18 @@ export default function ContactChatScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior="padding"
-        keyboardVerticalOffset={0}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        enabled={Platform.OS === 'ios'}
       >
-        <ThemedView style={styles.container}>
+        {/* <ThemedView 
+          style={[
+            styles.container, 
+            Platform.OS === 'android' && keyboardHeight > 0 && { 
+              marginBottom: keyboardHeight 
+            }
+          ]}
+        > */}
           {/* Header */}
           <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.borderLight }]}>
             <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
@@ -404,7 +433,14 @@ export default function ContactChatScreen() {
           </ImageBackground>
 
           {/* Input area */}
-          <View style={[styles.inputRow, { backgroundColor: colors.backgroundSecondary }]}>
+          <View style={[
+            styles.inputRow, 
+            { backgroundColor: colors.backgroundSecondary },
+            // Only add padding bottom when keyboard is NOT visible
+            Platform.OS === 'android' && keyboardHeight === 0 && { 
+              paddingBottom: Math.max(insets.bottom, 8) 
+            }
+          ]}>
             <View style={[styles.inputBox, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
               <TextInput
                 style={[styles.textInput, { color: colors.inputText }]}
@@ -428,7 +464,7 @@ export default function ContactChatScreen() {
               <Ionicons name="send" size={20} color={colors.buttonPrimaryText} />
             </TouchableOpacity>
           </View>
-        </ThemedView>
+        {/* </ThemedView>\ */}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -576,7 +612,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingTop: 8,
-    paddingBottom: Platform.OS === 'ios' ? 8 : 12,
   },
   inputBox: {
     flex: 1,
