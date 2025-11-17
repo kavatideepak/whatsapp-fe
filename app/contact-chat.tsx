@@ -85,6 +85,7 @@ export default function ContactChatScreen() {
   }>({ is_online: false });
   const flatListRef = React.useRef<FlatList>(null);
   const typingTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [keyboardHeight, setKeyboardHeight] = React.useState(0);
 
   // Show connection status
   React.useEffect(() => {
@@ -94,6 +95,24 @@ export default function ContactChatScreen() {
       chatId,
     });
   }, [isConnected, isAuthenticated, chatId]);
+
+  // Keyboard event listeners for Android
+  React.useEffect(() => {
+    if (Platform.OS !== 'android') return;
+
+    const keyboardWillShow = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+
+    const keyboardWillHide = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+
+    return () => {
+      keyboardWillShow.remove();
+      keyboardWillHide.remove();
+    };
+  }, []);
 
   // Listen for presence updates from socket
   React.useEffect(() => {
@@ -315,11 +334,11 @@ return (
   <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
-      enabled
+      enabled={Platform.OS === 'ios'}
     >
-      <ThemedView style={styles.container}>
+      <ThemedView style={[styles.container, Platform.OS === 'android' && { marginBottom: keyboardHeight }]}>
         {/* Header */}
         <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.borderLight }]}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
