@@ -2,11 +2,21 @@ import { HapticTab } from '@/components/haptic-tab';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { getChats } from '@/services/api';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSocket } from '@/hooks/useSocket';
 import { useTheme } from '@/hooks/useTheme';
+import { 
+  CallsIcon, 
+  CallsFilledIcon, 
+  ContactsIcon, 
+  ContactsFilledIcon, 
+  ChatsIcon, 
+  ChatsFilledIcon, 
+  SettingsIcon, 
+  SettingsFilledIcon 
+} from '@/components/icons/tab-icons';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -108,11 +118,19 @@ export default function TabLayout() {
               styles.iconWrapper,
               isDark && focused && { backgroundColor: colors.accent, borderRadius: 20 }
             ]}>
-              <Image 
-                source={require('../../assets/images/calls.png')}
-                style={styles.tabIcon} 
-                resizeMode="contain"
-              />
+              {focused ? (
+                <CallsFilledIcon 
+                  width={26} 
+                  height={26} 
+                  color={isDark ? '#fff' : colors.accent} 
+                />
+              ) : (
+                <CallsIcon 
+                  width={26} 
+                  height={26} 
+                  color={colors.tabIconDefault} 
+                />
+              )}
             </View>
           ),
         }}
@@ -126,14 +144,19 @@ export default function TabLayout() {
               styles.iconWrapper,
               isDark && focused && { backgroundColor: colors.accent, borderRadius: 20 }
             ]}>
-              <Image 
-                source={(!isDark && focused) 
-                  ? require('../../assets/images/contacts_filled.png') 
-                  : require('../../assets/images/contacts.png')
-                }
-                style={styles.tabIcon} 
-                resizeMode="contain"
-              />
+              {focused ? (
+                <ContactsFilledIcon 
+                  width={26} 
+                  height={26} 
+                  color={isDark ? '#fff' : colors.accent} 
+                />
+              ) : (
+                <ContactsIcon 
+                  width={26} 
+                  height={26} 
+                  color={colors.tabIconDefault} 
+                />
+              )}
             </View>
           ),
         }}
@@ -148,14 +171,19 @@ export default function TabLayout() {
                 styles.iconWrapper,
                 isDark && focused && { backgroundColor: colors.accent, borderRadius: 20 }
               ]}>
-                <Image 
-                  source={(!isDark && focused) 
-                    ? require('../../assets/images/chat_filled.png') 
-                    : require('../../assets/images/chat.png')
-                  }
-                  style={styles.tabIcon} 
-                  resizeMode="contain"
-                />
+                {focused ? (
+                  <ChatsFilledIcon 
+                    width={26} 
+                    height={26} 
+                    color={isDark ? '#fff' : colors.accent} 
+                  />
+                ) : (
+                  <ChatsIcon 
+                    width={26} 
+                    height={26} 
+                    color={colors.tabIconDefault} 
+                  />
+                )}
               </View>
               {totalUnreadCount > 0 && (
                 <View style={[styles.badge, { 
@@ -180,11 +208,19 @@ export default function TabLayout() {
               styles.iconWrapper,
               isDark && focused && { backgroundColor: colors.accent, borderRadius: 20 }
             ]}>
-              <Image 
-                source={require('../../assets/images/gear.png')}
-                style={styles.tabIcon} 
-                resizeMode="contain"
-              />
+              {focused ? (
+                <SettingsFilledIcon 
+                  width={26} 
+                  height={26} 
+                  color={isDark ? '#fff' : colors.accent} 
+                />
+              ) : (
+                <SettingsIcon 
+                  width={26} 
+                  height={26} 
+                  color={colors.tabIconDefault} 
+                />
+              )}
             </View>
           ),
         }}
@@ -208,10 +244,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 12,
     paddingVertical: 4,
-  },
-  tabIcon: {
-    width: 26,
-    height: 26,
   },
   badge: {
     position: 'absolute',

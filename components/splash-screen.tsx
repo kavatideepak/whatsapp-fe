@@ -1,13 +1,14 @@
 import { router } from 'expo-router';
 import React, { useEffect } from 'react';
-import { Image, Platform, StyleSheet, Text, View } from 'react-native';
-import { Colors } from '../constants/theme';
+import { Platform, StyleSheet, Text, View, useColorScheme } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../hooks/useTheme';
+import { SynapseLogo } from './icons/synapse-logo';
 
 export default function SplashScreen() {
   const { isAuthenticated, isLoading } = useAuth();
   const { colors } = useTheme();
+  const colorScheme = useColorScheme();
 
   useEffect(() => {
     // Wait for auth to finish loading, then navigate
@@ -29,10 +30,10 @@ export default function SplashScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
-        <Image
-          source={require('../assets/images/synapse_logo.png')}
-          style={styles.logo}
-          resizeMode="contain"
+        <SynapseLogo 
+          width={200} 
+          height={75.6} 
+          isDark={colorScheme === 'dark'} 
         />
       </View>
       <Text style={[styles.poweredBy, { color: colors.textSecondary }]}>
@@ -50,10 +51,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  logo: {
-    width: 200,
-    height: 200,
   },
   poweredBy: {
     fontSize: 14,

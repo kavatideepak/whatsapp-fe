@@ -1,15 +1,30 @@
 {
   "expo": {
     "name": "synapse",
-    "slug": "synapse",
+    "slug": "synapsedev",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "synapse",
     "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/images/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
+      "splash": {
+        "image": "./assets/images/icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#ffffff",
+        "dark": {
+          "image": "./assets/images/icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#000000"
+        }
+      },
       "infoPlist": {
         "NSContactsUsageDescription": "Synapse needs access to your contacts to help you connect with your teammates who are already using the app.",
         "NSContactsWriteUsageDescription": "Synapse needs permission to save your teammates to your phone's contacts for easy calling and messaging."
@@ -17,6 +32,16 @@
     },
     "android": {
       "package": "com.synapse.app",
+      "splash": {
+        "image": "./assets/images/icon.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#ffffff",
+        "dark": {
+          "image": "./assets/images/icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#000000"
+        }
+      },
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -48,8 +73,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "f77e7e0a-5a0a-4008-84d2-61917da92daf"
+        "projectId": "86b20382-884a-4989-bb8e-b1f1e25b3845"
       }
-    }
+    },
+    "owner": "deepak_k"
   }
 }

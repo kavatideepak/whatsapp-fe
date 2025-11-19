@@ -1,13 +1,15 @@
 import { router } from 'expo-router';
 import React from 'react';
-import { Dimensions, Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Image, Platform, Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
 import { Colors } from '../constants/theme';
 import { useTheme } from '../hooks/useTheme';
+import { SynapseLogo } from './icons/synapse-logo';
 
 const { width } = Dimensions.get('window');
 
 export default function OnboardingScreen() {
   const { colors } = useTheme();
+  const colorScheme = useColorScheme();
   
   const handleGetStarted = () => {
     // Navigate to phone verification
@@ -17,10 +19,10 @@ export default function OnboardingScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.topSection}>
-        <Image
-          source={require('../assets/images/synapse_logo.png')}
-          style={styles.logo}
-          resizeMode="contain"
+        <SynapseLogo
+          width={120}
+          // height={40}
+          isDark={colorScheme === 'dark'}
         />
         <Image
           source={require('../assets/images/onbaording_banner.png')}
@@ -58,11 +60,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingTop: 80,
+    gap: 20,
     maxHeight: '50%',
   },
   logo: {
-    width: 120,
-    height: 40,
     marginBottom: 40
   },
   banner: {
