@@ -13,6 +13,7 @@ import {
     sendMessageViaSocket,
     sendTypingIndicator,
 } from '@/services/socket';
+import { uploadMessageMedia, uploadMultipleMessageMedia } from '@/services/api';
 import {
     GetMessagesResponse,
     Message,
@@ -20,6 +21,8 @@ import {
     SocketMessageSentPayload,
 } from '@/types/api';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import * as ImagePicker from 'expo-image-picker';
+import { Alert } from 'react-native';
 
 interface UseChatOptions {
   chatId: number | null;
@@ -32,10 +35,12 @@ interface UseChatReturn {
   isLoading: boolean;
   error: string | null;
   sendMessage: (content: string, messageType?: MessageType) => void;
+  sendImageMessage: (imageUri: string, caption?: string) => Promise<void>;
   loadMessages: () => Promise<void>;
   markAsRead: (messageIds: number[]) => void;
   setTyping: (isTyping: boolean) => void;
   typingUsers: Set<number>;
+  isUploadingMedia: boolean;
 }
 
 /**
@@ -48,6 +53,7 @@ export function useChat(options: UseChatOptions): UseChatReturn {
   const { token, user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploadingMedia, setIsUploadingMedia] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [typingUsers, setTypingUsers] = useState<Set<number>>(new Set());
   const socketRef = useRef(getSocket());
@@ -189,6 +195,102 @@ export function useChat(options: UseChatOptions): UseChatReturn {
     },
     [chatId, user]
   );
+
+  /**
+   * Send image message with URI and caption
+   */
+  const sendImageMessage = useCallback(async (imageUri: string, caption: string = '') => {
+    if (!chatId || !user?.id) {
+      console.warn('⚠️ Cannot send image: missing chatId or user');
+      return;
+    }
+
+    if (!imageUri) {
+      console.warn('⚠️ Cannot send image: missing imageUri');
+      return;
+    }
+
+    try {
+      await sendImagesWithCaption([imageUri], caption);
+    } catch (err: any) {
+      console.error('❌ Failed to send image:', err);
+      Alert.alert('Upload Failed', err.message || 'Failed to upload image. Please try again.');
+    }
+  }, [chatId, user]);
+
+  /**
+   * Internal function to upload and send image(s) with caption
+   */
+  const sendImagesWithCaption = async (imageUris: string[], caption: string) => {
+    console.log('🖼️ sendImagesWithCaption called:', { imageCount: imageUris.length, hasCaption: !!caption });
+    
+    try {
+      setIsUploadingMedia(true);
+
+      console.log(`📤 Uploading ${imageUris.length} image(s)`);
+
+      let content: string;
+      
+      if (imageUris.length === 1) {
+        // Single image - upload normally
+        console.log('📤 Uploading single image:', imageUris[0]);
+        const { url } = await uploadMessageMedia(imageUris[0]);
+        content = url;
+        console.log('✅ Single image uploaded:', url);
+      } else {
+        // Multiple images - upload and store as JSON array
+        console.log('📤 Uploading multiple images');
+        const { urls } = await uploadMultipleMessageMedia(imageUris);
+        content = JSON.stringify(urls);
+        console.log(`✅ ${urls.length} images uploaded`);
+      }
+
+      // Send message with image URL(s) and caption
+      const tempId = `temp-${Date.now()}-${Math.random()}`;
+      const now = new Date().toISOString();
+
+      console.log('📝 Creating temp message:', { tempId, content, caption });
+
+      // Optimistic UI update
+      const tempMessage: Message = {
+        id: tempId,
+        chat_id: chatId!,
+        sender_id: user!.id,
+        content: content,
+        message_type: 'image',
+        caption: caption || undefined,
+        sent_at: now,
+        created_at: now,
+        status: 'sending',
+        tempId,
+      };
+
+      setMessages((prev) => [tempMessage, ...prev]);
+
+      // Send via socket with proper caption handling
+      const messageData: any = {
+        chat_id: chatId!,
+        content: content,
+        message_type: 'image',
+        tempId,
+      };
+      
+      // Only include caption if it's not empty
+      if (caption && caption.trim()) {
+        messageData.caption = caption.trim();
+      }
+      
+      console.log('🚀 Sending message via socket:', messageData);
+      sendMessageViaSocket(messageData);
+
+      console.log('📤 Image message sent via socket');
+    } catch (err: any) {
+      console.error('❌ Failed to send images:', err);
+      Alert.alert('Upload Failed', err.message || 'Failed to upload images. Please try again.');
+    } finally {
+      setIsUploadingMedia(false);
+    }
+  };
 
   /**
    * Mark messages as read
@@ -409,9 +511,11 @@ export function useChat(options: UseChatOptions): UseChatReturn {
     isLoading,
     error,
     sendMessage,
+    sendImageMessage,
     loadMessages,
     markAsRead,
     setTyping,
     typingUsers,
+    isUploadingMedia,
   };
 }

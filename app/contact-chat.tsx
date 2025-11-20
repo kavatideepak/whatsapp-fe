@@ -16,6 +16,7 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -70,9 +71,11 @@ export default function ContactChatScreen() {
     isLoading,
     error: chatError,
     sendMessage,
+    sendImageMessage,
     markAsRead,
     setTyping,
     typingUsers,
+    isUploadingMedia,
   } = useChat({
     chatId,
     autoMarkDelivered: true,
@@ -85,8 +88,10 @@ export default function ContactChatScreen() {
     last_seen?: string;
   }>({ is_online: false });
   const flatListRef = React.useRef<FlatList>(null);
+  const textInputRef = React.useRef<TextInput>(null);
   const typingTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const [keyboardHeight, setKeyboardHeight] = React.useState(0);
+  const [selectedImageUri, setSelectedImageUri] = React.useState<string | null>(null);
 
   // Show connection status
   React.useEffect(() => {
@@ -197,9 +202,12 @@ export default function ContactChatScreen() {
     }
   };
 
-  // Handle send message
-  const handleSend = () => {
-    if (!input.trim()) return;
+  // Handle send message (text and/or image)
+  const handleSend = async () => {
+    const textContent = input.trim();
+    const hasImage = !!selectedImageUri;
+    
+    if (!textContent && !hasImage) return;
 
     // Stop typing indicator
     setTyping(false);
@@ -207,9 +215,17 @@ export default function ContactChatScreen() {
       clearTimeout(typingTimeoutRef.current);
     }
 
-    // Send message via socket
-    sendMessage(input.trim(), 'text');
-    setInput('');
+    // If there's an image selected, send it with text as caption
+    if (hasImage) {
+      const imageUri = selectedImageUri;
+      setSelectedImageUri(null);
+      setInput('');
+      await sendImageMessage(imageUri, textContent);
+    } else {
+      // Just text message
+      setInput('');
+      sendMessage(textContent, 'text');
+    }
 
     // Scroll to bottom (index 0 in inverted list)
     setTimeout(() => {
@@ -217,6 +233,46 @@ export default function ContactChatScreen() {
         flatListRef.current.scrollToIndex({ index: 0, animated: true });
       }
     }, 100);
+  };
+
+  // Handle image button press - select image and show preview
+  const handleImagePress = async () => {
+    if (isUploadingMedia) return;
+    
+    const ImagePicker = require('expo-image-picker');
+    
+    try {
+      // Request permission
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (!permissionResult.granted) {
+        const { Alert } = require('react-native');
+        Alert.alert('Permission Required', 'Permission to access photos is required to send images.');
+        return;
+      }
+
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsMultipleSelection: false,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setSelectedImageUri(result.assets[0].uri);
+        // Focus text input after a short delay
+        setTimeout(() => {
+          textInputRef.current?.focus();
+        }, 100);
+      }
+    } catch (error) {
+      console.error('Error selecting image:', error);
+    }
+  };
+
+  // Handle remove selected image
+  const handleRemoveImage = () => {
+    setSelectedImageUri(null);
   };
 
   // Format timestamp
@@ -298,7 +354,9 @@ export default function ContactChatScreen() {
           styles.bubble,
           isFromMe 
             ? [styles.bubbleRight, { backgroundColor: colors.bubbleSent }] 
-            : [styles.bubbleLeft, { backgroundColor: colors.bubbleReceived }]
+            : [styles.bubbleLeft, { backgroundColor: colors.bubbleReceived }],
+          // Add padding for text messages only
+          item.message_type === 'text' && styles.textBubblePadding
         ]}>
           {item.is_deleted ? (
             <Text style={[
@@ -308,20 +366,113 @@ export default function ContactChatScreen() {
             ]}>
               {item.content}
             </Text>
+          ) : item.message_type === 'image' ? (
+            <>
+              {(() => {
+                // Check if content is JSON array (multiple images)
+                let imageUrls: string[] = [];
+                try {
+                  const parsed = JSON.parse(item.content);
+                  if (Array.isArray(parsed)) {
+                    imageUrls = parsed;
+                  } else {
+                    imageUrls = [item.content];
+                  }
+                } catch {
+                  imageUrls = [item.content];
+                }
+
+                const hasCaption = item.caption && item.caption.trim().length > 0;
+
+                return (
+                  <View style={styles.imageMessageContainer}>
+                    {imageUrls.length > 1 ? (
+                      // Multiple images - horizontal gallery
+                      <ScrollView 
+                        horizontal 
+                        showsHorizontalScrollIndicator={false}
+                        style={styles.imageGallery}
+                      >
+                        {imageUrls.map((url, index) => (
+                          <Image
+                            key={index}
+                            source={{ uri: url }}
+                            style={[
+                              styles.messageImage,
+                              index < imageUrls.length - 1 && { marginRight: 4 }
+                            ]}
+                            resizeMode="cover"
+                          />
+                        ))}
+                      </ScrollView>
+                    ) : (
+                      // Single image with overlay timestamp (WhatsApp style)
+                      <View style={styles.imageWrapper}>
+                        <Image
+                          source={{ uri: imageUrls[0] }}
+                          style={[
+                            styles.messageImage,
+                            hasCaption && { marginBottom: 0 } // No margin if there's a caption
+                          ]}
+                          resizeMode="cover"
+                        />
+                        {/* Timestamp overlay on image (only if no caption) */}
+                        {!hasCaption && (
+                          <View style={[
+                            styles.imageTimeOverlay,
+                            isFromMe ? styles.imageTimeOverlayRight : styles.imageTimeOverlayLeft
+                          ]}>
+                            <Text style={styles.imageTimeText}>
+                              {formatTime(item.sent_at || item.created_at || '')}
+                            </Text>
+                            {isFromMe && (
+                              <View style={styles.imageStatusOverlay}>
+                                {renderStatus()}
+                              </View>
+                            )}
+                          </View>
+                        )}
+                      </View>
+                    )}
+                    
+                    {/* Caption below image (WhatsApp style) */}
+                    {hasCaption && (
+                      <View style={styles.captionContainer}>
+                        <Text style={[
+                          styles.captionText,
+                          { color: isFromMe ? colors.bubbleSentText : colors.bubbleReceivedText }
+                        ]}>
+                          {item.caption}
+                        </Text>
+                        {/* Timestamp with caption */}
+                        <View style={styles.captionFooter}>
+                          <Text style={[styles.timeText, { color: isFromMe ? 'rgba(255,255,255,0.7)' : colors.textTertiary }]}>
+                            {formatTime(item.sent_at || item.created_at || '')}
+                          </Text>
+                          {isFromMe && renderStatus()}
+                        </View>
+                      </View>
+                    )}
+                  </View>
+                );
+              })()}
+            </>
           ) : (
-            <Text style={[
-              isFromMe ? styles.textRight : styles.textLeft,
-              { color: isFromMe ? colors.bubbleSentText : colors.bubbleReceivedText }
-            ]}>
-              {item.content}
-            </Text>
+            <>
+              <Text style={[
+                isFromMe ? styles.textRight : styles.textLeft,
+                { color: isFromMe ? colors.bubbleSentText : colors.bubbleReceivedText }
+              ]}>
+                {item.content}
+              </Text>
+              <View style={styles.messageFooter}>
+                <Text style={[styles.timeText, { color: isFromMe ? colors.bubbleSentText : colors.textTertiary }]}>
+                  {formatTime(item.sent_at || item.created_at || '')}
+                </Text>
+                {renderStatus()}
+              </View>
+            </>
           )}
-          <View style={styles.messageFooter}>
-            <Text style={[styles.timeText, { color: isFromMe ? colors.bubbleSentText : colors.textTertiary }]}>
-              {formatTime(item.sent_at || item.created_at || '')}
-            </Text>
-            {renderStatus()}
-          </View>
         </View>
       </View>
     );
@@ -371,12 +522,10 @@ export default function ContactChatScreen() {
                 {contact?.name ?? 'Unknown'}
               </Text>
               <Text style={[styles.contactSub, { color: colors.textSecondary }]}>
-                {!isConnected
-                  ? 'Connecting...'
-                  : !isAuthenticated
-                  ? 'Authenticating...'
-                  : typingUsers.size > 0
+                {typingUsers.size > 0
                   ? 'typing...'
+                  : recipientPresence.is_online
+                  ? 'Online'
                   : formatLastSeen()}
               </Text>
             </View>
@@ -434,35 +583,66 @@ export default function ContactChatScreen() {
 
           {/* Input area */}
           <View style={[
-            styles.inputRow, 
+            styles.inputContainer, 
             { backgroundColor: colors.backgroundSecondary },
-            // Only add padding bottom when keyboard is NOT visible
             Platform.OS === 'android' && keyboardHeight === 0 && { 
               paddingBottom: Math.max(insets.bottom, 8) 
             }
           ]}>
-            <View style={[styles.inputBox, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
-              <TextInput
-                style={[styles.textInput, { color: colors.inputText }]}
-                placeholder="Message..."
-                placeholderTextColor={colors.inputPlaceholder}
-                value={input}
-                onChangeText={handleInputChange}
-                multiline
-                editable={isConnected && isAuthenticated}
-              />
+            {/* Image preview */}
+            {selectedImageUri && (
+              <View style={[styles.imagePreviewContainer, { backgroundColor: colors.background }]}>
+                <Image source={{ uri: selectedImageUri }} style={styles.imagePreview} resizeMode="cover" />
+                <TouchableOpacity 
+                  onPress={handleRemoveImage} 
+                  style={[styles.removeImageBtn, { backgroundColor: 'rgba(0,0,0,0.6)' }]}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Ionicons name="close" size={16} color="#FFF" />
+                </TouchableOpacity>
+              </View>
+            )}
+            
+            <View style={styles.inputRow}>
+              <TouchableOpacity
+                style={[styles.attachBtn, { opacity: isUploadingMedia ? 0.5 : 1 }]}
+                onPress={handleImagePress}
+                disabled={isUploadingMedia}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                {isUploadingMedia ? (
+                  <ActivityIndicator size="small" color={colors.icon} />
+                ) : (
+                  <Ionicons name="image-outline" size={24} color={colors.icon} />
+                )}
+              </TouchableOpacity>
+              <View style={[styles.inputBox, { backgroundColor: colors.inputBackground, borderColor: colors.inputBorder }]}>
+                <TextInput
+                  ref={textInputRef}
+                  style={[styles.textInput, { color: colors.inputText }]}
+                  placeholder={selectedImageUri ? "Add a message..." : "Message..."}
+                  placeholderTextColor={colors.inputPlaceholder}
+                  value={input}
+                  onChangeText={handleInputChange}
+                  multiline
+                  editable={true}
+                  blurOnSubmit={false}
+                  returnKeyType="default"
+                />
+              </View>
+              <TouchableOpacity
+                style={[
+                  styles.sendBtn, 
+                  { backgroundColor: colors.sendBtn },
+                  ((!input.trim() && !selectedImageUri) || isUploadingMedia) && styles.sendBtnDisabled
+                ]}
+                onPress={handleSend}
+                disabled={(!input.trim() && !selectedImageUri) || isUploadingMedia}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Ionicons name="send" size={20} color={colors.buttonPrimaryText} />
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              style={[
-                styles.sendBtn, 
-                { backgroundColor: colors.sendBtn },
-                (!isConnected || !isAuthenticated || !input.trim()) && styles.sendBtnDisabled
-              ]}
-              onPress={handleSend}
-              disabled={!isConnected || !isAuthenticated || !input.trim()}
-            >
-              <Ionicons name="send" size={20} color={colors.buttonPrimaryText} />
-            </TouchableOpacity>
           </View>
         {/* </ThemedView>\ */}
       </KeyboardAvoidingView>
@@ -552,15 +732,20 @@ const styles = StyleSheet.create({
   },
   bubble: {
     maxWidth: window.width * 0.72,
+    paddingVertical: 2,
+    paddingHorizontal: 2,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  textBubblePadding: {
     paddingVertical: 8,
     paddingHorizontal: 12,
-    borderRadius: 16,
   },
   bubbleLeft: {
-    borderTopLeftRadius: 6,
+    borderTopLeftRadius: 2,
   },
   bubbleRight: {
-    borderTopRightRadius: 6,
+    borderTopRightRadius: 2,
   },
   textLeft: {
     fontSize: 14,
@@ -578,6 +763,65 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     marginTop: 4,
+  },
+  messageImage: {
+    width: 250,
+    height: 250,
+    borderRadius: 6,
+  },
+  imageGallery: {
+    marginBottom: 0,
+  },
+  imageMessageContainer: {
+    borderRadius: 6,
+    overflow: 'hidden',
+  },
+  imageWrapper: {
+    position: 'relative',
+  },
+  imageTimeOverlay: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 10,
+    gap: 4,
+  },
+  imageTimeOverlayLeft: {
+    // Additional styles for left bubble if needed
+  },
+  imageTimeOverlayRight: {
+    // Additional styles for right bubble if needed
+  },
+  imageTimeText: {
+    fontSize: 11,
+    color: '#FFFFFF',
+    fontWeight: '400',
+  },
+  imageStatusOverlay: {
+    flexDirection: 'row',
+    marginLeft: -4,
+  },
+  captionContainer: {
+    paddingHorizontal: 10,
+    paddingTop: 6,
+    paddingBottom: 8,
+  },
+  captionText: {
+    fontSize: 14,
+    lineHeight: 19,
+    marginBottom: 2,
+  },
+  captionFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 4,
+    marginTop: 2,
   },
   statusText: {
     fontSize: 11,
@@ -607,11 +851,41 @@ const styles = StyleSheet.create({
   sendBtnDisabled: {
     opacity: 0.5,
   },
-  inputRow: {
+  inputContainer: {
     paddingHorizontal: 12,
+    paddingTop: 8,
+  },
+  imagePreviewContainer: {
+    position: 'relative',
+    marginBottom: 8,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  imagePreview: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+  },
+  removeImageBtn: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 8,
+  },
+  attachBtn: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 4,
   },
   inputBox: {
     flex: 1,

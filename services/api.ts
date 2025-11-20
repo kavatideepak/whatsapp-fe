@@ -456,3 +456,171 @@ export async function addCorporateContacts(corporateContactIds: number[]): Promi
     },
   });
 }
+
+/**
+ * Test API connection (useful for debugging)
+ */
+export async function testConnection(): Promise<boolean> {
+  try {
+    const response = await fetch(buildUrl('/../../health'), {
+      method: 'GET',
+    });
+    const data = await response.json();
+    console.log('✅ Connection test successful:', data);
+    return response.ok && data.status === 'ok';
+  } catch (error) {
+    console.error('❌ Connection test failed:', error);
+    return false;
+  }
+}
+
+/**
+ * Upload message media (image/video)
+ */
+export async function uploadMessageMedia(mediaUri: string): Promise<{ url: string; type: 'image' | 'video' }> {
+  try {
+    const token = await getAuthToken();
+    
+    if (!token) {
+      throw {
+        error: 'Unauthorized',
+        message: 'Authentication token not found',
+        statusCode: 401,
+      } as ApiError;
+    }
+
+    const formData = new FormData();
+    
+    // Extract filename from URI
+    const filename = mediaUri.split('/').pop() || 'media.jpg';
+    const match = /\.(\w+)$/.exec(filename);
+    const extension = match ? match[1].toLowerCase() : 'jpg';
+    
+    // Determine MIME type based on extension
+    let type = 'image/jpeg';
+    if (['mp4', 'mov', 'avi'].includes(extension)) {
+      type = `video/${extension}`;
+    } else if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(extension)) {
+      type = `image/${extension}`;
+    }
+
+    // Append the media file
+    formData.append('media', {
+      uri: mediaUri,
+      name: filename,
+      type: type,
+    } as any);
+
+    const uploadUrl = buildUrl('/messages/upload-media');
+    console.log('📤 Uploading message media:', { filename, type, url: uploadUrl });
+
+    const response = await fetch(uploadUrl, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        // Don't set Content-Type for FormData
+      },
+    });
+
+    console.log('📡 Upload response status:', response.status);
+    const data = await response.json();
+    console.log('📡 Upload media response data:', data);
+
+    if (!response.ok) {
+      throw {
+        error: data.error || 'Upload failed',
+        message: data.message,
+        statusCode: response.status,
+      } as ApiError;
+    }
+
+    return data.data as { url: string; type: 'image' | 'video' };
+  } catch (error) {
+    console.error('❌ Error uploading message media:', error);
+    
+    if ((error as ApiError).error) {
+      throw error;
+    }
+    
+    throw {
+      error: 'Network error',
+      message: 'Failed to upload media. Please check your connection.',
+    } as ApiError;
+  }
+}
+
+/**
+ * Upload multiple message media files (images/videos)
+ */
+export async function uploadMultipleMessageMedia(mediaUris: string[]): Promise<{ urls: string[]; count: number; type: 'image' | 'video' }> {
+  try {
+    const token = await getAuthToken();
+    
+    if (!token) {
+      throw {
+        error: 'Unauthorized',
+        message: 'Authentication token not found',
+        statusCode: 401,
+      } as ApiError;
+    }
+
+    const formData = new FormData();
+    
+    // Append all media files
+    for (let i = 0; i < mediaUris.length; i++) {
+      const mediaUri = mediaUris[i];
+      const filename = mediaUri.split('/').pop() || `media${i}.jpg`;
+      const match = /\.(\w+)$/.exec(filename);
+      const extension = match ? match[1].toLowerCase() : 'jpg';
+      
+      let type = 'image/jpeg';
+      if (['mp4', 'mov', 'avi'].includes(extension)) {
+        type = `video/${extension}`;
+      } else if (['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(extension)) {
+        type = `image/${extension}`;
+      }
+
+      formData.append('media', {
+        uri: mediaUri,
+        name: filename,
+        type: type,
+      } as any);
+    }
+
+    console.log(`📤 Uploading ${mediaUris.length} media files`);
+
+    const response = await fetch(buildUrl('/messages/upload-media'), {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    const data = await response.json();
+    
+    console.log('📡 Upload multiple media response:', response.status, data);
+
+    if (!response.ok) {
+      throw {
+        error: data.error || 'Upload failed',
+        message: data.message,
+        statusCode: response.status,
+      } as ApiError;
+    }
+
+    return data.data as { urls: string[]; count: number; type: 'image' | 'video' };
+  } catch (error) {
+    console.error('❌ Error uploading multiple message media:', error);
+    
+    if ((error as ApiError).error) {
+      throw error;
+    }
+    
+    throw {
+      error: 'Network error',
+      message: 'Failed to upload media. Please check your connection.',
+    } as ApiError;
+  }
+}

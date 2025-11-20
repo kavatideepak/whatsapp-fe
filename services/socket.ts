@@ -155,6 +155,8 @@ export function sendMessageViaSocket(payload: {
   content: string;
   message_type?: string;
   tempId?: string;
+  caption?: string;
+  reply_to?: number;
 }): void {
   if (!isSocketReady()) {
     console.warn('⚠️ Socket not ready, cannot send message');
@@ -162,10 +164,34 @@ export function sendMessageViaSocket(payload: {
   }
 
   console.log('📤 Sending message via socket:', payload);
-  socket?.emit('send_message', {
-    ...payload,
+  
+  // Build the socket payload, only including caption if it's a non-empty string
+  const socketPayload: any = {
+    chat_id: payload.chat_id,
+    content: payload.content,
     message_type: payload.message_type || 'text',
-  });
+    tempId: payload.tempId,
+  };
+  
+  // Only add caption if it exists and is not empty
+  // Handle edge case where caption might be an object (e.g., React Native event)
+  if (payload.caption) {
+    const captionValue = typeof payload.caption === 'string' 
+      ? payload.caption.trim() 
+      : '';
+    
+    if (captionValue.length > 0) {
+      socketPayload.caption = captionValue;
+    }
+  }
+  
+  // Only add reply_to if it exists
+  if (payload.reply_to) {
+    socketPayload.reply_to = payload.reply_to;
+  }
+  
+  console.log('📤 Final socket payload:', socketPayload);
+  socket?.emit('send_message', socketPayload);
 }
 
 /**
