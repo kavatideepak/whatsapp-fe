@@ -94,6 +94,7 @@ export interface Message {
   sender_id: number;
   content: string;
   message_type: MessageType;
+  caption?: string; // Optional caption for image/video messages
   sent_at: string; // Backend uses sent_at, not created_at
   created_at?: string; // Keep for backwards compatibility
   status?: MessageStatus;
@@ -105,6 +106,7 @@ export interface SendMessageRequest {
   chat_id: number;
   content: string;
   message_type?: MessageType;
+  caption?: string;
   tempId?: string;
 }
 
